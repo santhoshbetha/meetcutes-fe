@@ -17,10 +17,14 @@ test.describe("public global announcement", () => {
     await mockAnnouncement(page, MESSAGE);
     await page.goto("/");
 
-    await expect(
-      page.getByTestId("global-announcement-banner"),
-    ).toBeVisible({ timeout: 20_000 });
+    const banner = page.getByTestId("global-announcement-banner");
+
+    await expect(banner).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText(MESSAGE)).toBeVisible();
+    await expect(banner).toHaveClass(/max-w-3xl/);
+    await expect(banner).toHaveClass(/rounded-2xl/);
+    await expect(banner).toHaveClass(/bg-amber-50\/60/);
+    await expect(banner).toHaveClass(/border-amber-200\/50/);
   });
 
   test("renders no banner or empty wrapper when the message is null", async ({
@@ -37,6 +41,24 @@ test.describe("public global announcement", () => {
 
   test("renders no banner when the message is empty", async ({ page }) => {
     await mockAnnouncement(page, "   ");
+    await page.goto("/");
+
+    await expect(
+      page.getByTestId("global-announcement-banner"),
+    ).toHaveCount(0, { timeout: 20_000 });
+  });
+
+  test("fails closed without a banner when the public endpoint errors", async ({
+    page,
+  }) => {
+    await page.route("**/api/v1/public/global-announcement", (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ status: "error", message: "Unavailable" }),
+      }),
+    );
+
     await page.goto("/");
 
     await expect(
