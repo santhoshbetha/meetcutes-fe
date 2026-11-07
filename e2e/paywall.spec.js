@@ -40,14 +40,16 @@ const PAYWALL_PROFILE = {
   visibilitypreference: "both",
 };
 
-async function seedPaywallSession(page) {
+async function seedPaywallSession(page, overrides = {}) {
+  const profile = { ...PAYWALL_PROFILE, ...overrides };
+
   await mockEmptyNotificationInbox(page);
 
   await page.route("**/api/users/profile", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ status: "success", user: PAYWALL_PROFILE }),
+      body: JSON.stringify({ status: "success", user: profile }),
     }),
   );
 
@@ -57,7 +59,7 @@ async function seedPaywallSession(page) {
       contentType: "application/json",
       body: JSON.stringify({
         status: "success",
-        data: { profile: PAYWALL_PROFILE },
+        data: { profile },
       }),
     }),
   );
@@ -115,7 +117,7 @@ async function seedPaywallSession(page) {
       },
       profiledata: profile,
     });
-  }, PAYWALL_PROFILE);
+  }, profile);
 }
 
 test.describe("premium paywall", () => {
@@ -153,5 +155,42 @@ test.describe("premium paywall", () => {
     await expect(
       page.getByRole("button", { name: /Find Events/i }).first(),
     ).toBeDisabled();
+  });
+
+  test("payment feature disabled bypasses both discovery gates", async ({
+    page,
+  }) => {
+    await seedPaywallSession(page, { payment_feature_enabled: false });
+
+    await page.goto("/dashboard?tab=users");
+    await expect(
+      page.getByRole("button", { name: /Find Matches/i }),
+    ).toBeEnabled({ timeout: 30_000 });
+    await expect(
+      page.getByText(/Premium Threshold Reached!/),
+    ).toHaveCount(0);
+
+    await page.goto("/dashboard?tab=search");
+    await expect(
+      page.getByRole("button", { name: /Find Events/i }).first(),
+    ).toBeEnabled({ timeout: 30_000 });
+    await expect(
+      page.getByText(/Premium Threshold Reached!/),
+    ).toHaveCount(0);
+  });
+
+  test("maintenance flag routes dashboard traffic to the maintenance screen", async ({
+    page,
+  }) => {
+    await seedPaywallSession(page, { maintenance_mode_active: true });
+
+    await page.goto("/dashboard?tab=users");
+
+    await expect(
+      page.getByText(/briefly down for scheduled server maintenance/i),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(
+      page.getByRole("heading", { name: "Find Connections" }),
+    ).toHaveCount(0);
   });
 });

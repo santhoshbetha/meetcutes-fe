@@ -28,5 +28,12 @@ export function aroundUserCount(profile) {
 }
 
 export function isPremiumPaywallActive(profile) {
+  const paymentFeatureEnabled =
+    profile?.payment_feature_enabled ??
+    profile?.paymentfeatureenabled ??
+    true;
+
+  if (paymentFeatureEnabled === false) return false;
+
   return aroundUserCount(profile) > 200 && !isSubscriptionActive(profile);
 }

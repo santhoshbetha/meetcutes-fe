@@ -69,10 +69,17 @@ function App() {
 
   const [theme, _setTheme] = useState("dark");
 
-  // Check if maintenance mode is enabled
-  const isMaintenanceMode = import.meta.env.VITE_MAINTENANCE_MODE === 'true' ||
-                           import.meta.env.VITE_MAINTENANCE_MODE === '1' ||
-                           import.meta.env.VITE_MAINTENANCE_MODE === 'yes';
+  // Maintenance can be enabled statically at build time or remotely through
+  // the backend profile payload. The remote flag lets a Coolify/Kamal operator
+  // pause the app without rebuilding the frontend image.
+  const envMaintenanceMode =
+    import.meta.env.VITE_MAINTENANCE_MODE === 'true' ||
+    import.meta.env.VITE_MAINTENANCE_MODE === '1' ||
+    import.meta.env.VITE_MAINTENANCE_MODE === 'yes';
+  const profileMaintenanceMode =
+    profiledata?.maintenance_mode_active === true ||
+    profiledata?.maintenancemodeactive === true;
+  const isMaintenanceMode = envMaintenanceMode || profileMaintenanceMode;
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -228,6 +235,7 @@ function App() {
             }>
             <Routes>
               <Route path="/" element={<Home setOpenLogin={setOpenLogin}/>} />
+              <Route path="/maintenance" element={<Maintenance />} />
 
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />
