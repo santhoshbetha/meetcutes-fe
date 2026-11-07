@@ -4,6 +4,7 @@ import HeroSection from "@/components/HeroSection";
 import AboutSection from "@/components/AboutSection";
 import { PopularLocations } from "@/components/PopularLocations";
 import Footer from "@/components/Footer";
+import { GlobalAnnouncementBanner } from "@/components/GlobalAnnouncementBanner";
 import { useAuth } from "../context/AuthContext";
 
 export function Home({ setOpenLogin }) {
@@ -16,11 +17,12 @@ export function Home({ setOpenLogin }) {
     } else {
         navigate('/')
     }
-  }, [user, profiledata])
+  }, [user, profiledata, navigate])
 
   return (
     <div>
       <main>
+        {!user && <GlobalAnnouncementBanner />}
         <HeroSection 
           setOpenLogin={setOpenLogin}
         />
