@@ -120,10 +120,10 @@ export const QUESTIONNAIRE_SECTIONS = [
         audiences: ["female"],
         optional: true,
       },
-      {
-        ...sharedQuestion("q15_optional", "Capitalism", "Socialism"),
-        optional: true,
-      },
+      // {
+      //   ...sharedQuestion("q15_optional", "Capitalism", "Socialism"),
+      //   optional: true,
+      // },
     ],
   },
   {
