@@ -16,8 +16,6 @@
     "cf:whoami": "wrangler whoami"
   },
   "dependencies": {
-    "@capacitor/android": "^8.6.0",
-    "@capacitor/core": "^8.6.0",
     "@geoapify/geocoder-autocomplete": "^3.0.1",
     "@geoapify/react-geocoder-autocomplete": "^3.0.0",
     "@radix-ui/react-accordion": "^1.2.12",
@@ -70,7 +68,6 @@
     "zustand": "^5.0.16"
   },
   "devDependencies": {
-    "@capacitor/cli": "^8.6.0",
     "@eslint/js": "^9.36.0",
     "@playwright/test": "^1.64.1",
     "@types/node": "^24.7.2",
