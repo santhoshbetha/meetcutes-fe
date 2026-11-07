@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { haversine } from "../utils/util";
 
-export function EventList({ events, userlatitude, userlongitude, setIsLoading, profiledata }) {
+export function EventList({ events, userlatitude, userlongitude, profiledata }) {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [sortBy, setSortBy] = useState("Date");
   const resultsRef = useRef(null);
