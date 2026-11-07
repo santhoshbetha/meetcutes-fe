@@ -48,18 +48,25 @@ function formatActiveStatus(timestamp) {
     return `Active ${lastSeen.format("MMM D, YYYY")}`;
 }
 
+function leaningTagForQuestion(question, value) {
+    if (value > 60) return `Prefers ${question.right}`;
+    if (value < 40) return `Prefers ${question.left}`;
+    return "Balanced preference";
+}
+
 // Configured Questionnaire Data Matrix maps for iterative rendering
 const MALE_QUESTIONS = [
     { key: "q1", left: "Android", right: "iPhone" },
-    { key: "q2", left: "Capitalism", right: "Equal Opportunities" },
     { key: "q3", left: "Truck", right: "BMW" },
-    { key: "q4", left: "Socialism", right: "Pyramid Scheme" },
     { key: "q5", left: "Modern Family", right: "Traditional Family" },
     { key: "q6", left: "Suit/Formal dress", right: "Jeans and T-shirt" },
     { key: "q7", left: "Partner", right: "Title Wife" },
     { key: "q8", left: "Concerts/Clubs", right: "Movie at home" },
     { key: "q9", left: "End goal Happiness", right: "End goal Family/kids" },
     { key: "q10", left: "Credit card", right: "Cash/Debit card" },
+    { key: "q2_optional", left: "Capitalism", right: "Equal Opportunities", optional: true },
+    { key: "q4_optional", left: "Socialism", right: "Pyramid Scheme", optional: true },
+    //{ key: "q15_optional", left: "Capitalism", right: "Socialism", optional: true },
 ];
 
 const FEMALE_QUESTIONS = [
@@ -67,8 +74,7 @@ const FEMALE_QUESTIONS = [
     { key: "q2", left: "Trader Joe's", right: "ALDI/WINCO" },
     { key: "q3", left: "Tesla", right: "Toyota" },
     { key: "q4", left: "Costco", right: "Whole Foods" },
-    { key: "q5", left: "Woman Rights", right: "Transwoman is woman" },
-    { key: "q6", left: "Pro-Choice", right: "Pro-Life" },
+    { key: "q6_optional", left: "Pro-Choice", right: "Pro-Life", optional: true },
     { key: "q7", left: "KOHL'S", right: "NORDSTROM" },
     { key: "q8", left: "Enchanted (film)", right: "Barbie (film)" },
     { key: "q9", left: "Power Couple", right: "Traditional Relationship" },
@@ -77,6 +83,7 @@ const FEMALE_QUESTIONS = [
     { key: "q12", left: "End goal Happiness", right: "End goal Family/kids" },
     { key: "q13", left: "Credit card", right: "Cash/Debit card" },
     { key: "q14", left: "Dog Mom/Cat Mom", right: "Pet Owner" },
+   // { key: "q15_optional", left: "Capitalism", right: "Socialism", optional: true },
 ];
 
 function readQuestionValue(profile, key) {
@@ -323,7 +330,13 @@ export function UserProfile() {
         );
     }
 
-    const activeQuestionSet = userData.gender === 'Male' ? MALE_QUESTIONS : FEMALE_QUESTIONS;
+    const activeQuestionSet = (
+        userData.gender === 'Male' ? MALE_QUESTIONS : FEMALE_QUESTIONS
+    ).filter(
+        (question) =>
+            !question.optional ||
+            readQuestionValue(userData, question.key) !== null,
+    );
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
@@ -634,6 +647,9 @@ export function UserProfile() {
                                     </div>
                                 </AccordionTrigger>
                                 <AccordionContent className="px-6 pb-6 pt-2">
+                                    <p className="mb-4 text-xs text-muted-foreground">
+                                        The slider marker shows this member&apos;s position for each preference.
+                                    </p>
 
                                     {/* Compatibility progress matrix */}
                                     <div className="grid grid-cols-1 gap-4">
@@ -643,39 +659,30 @@ export function UserProfile() {
                                                     userData,
                                                     question.key,
                                                 ) ?? 20;
-                                            const ownValue =
-                                                readQuestionValue(
-                                                    profiledata,
-                                                    question.key,
-                                                );
-                                            const aligned =
-                                                ownValue !== null &&
-                                                Math.abs(value - ownValue) <= 20;
-                                            const trackClass = aligned
-                                                ? "from-emerald-400 via-teal-400 to-cyan-400"
-                                                : "from-primary via-fuchsia-500 to-sky-400";
-                                            const pinClass = aligned
-                                                ? "bg-emerald-400 shadow-emerald-400/60"
-                                                : "bg-primary shadow-primary/60";
+                                            const leaningTag =
+                                                leaningTagForQuestion(question, value);
+                                            const trackClass =
+                                                "from-primary via-fuchsia-500 to-sky-400";
+                                            const pinClass =
+                                                "bg-primary shadow-primary/60";
 
                                             return (
                                                 <div
                                                     key={question.key}
+                                                    data-testid={`profile-question-${question.key}`}
                                                     className="rounded-2xl border border-white/10 bg-muted/30 p-4 backdrop-blur-md transition-colors hover:bg-muted/40"
                                                 >
                                                     <div className="flex items-center justify-between gap-3 text-xs font-semibold sm:text-sm">
                                                         <span className="truncate text-foreground">
                                                             {question.left}
                                                         </span>
-                                                        {aligned ? (
-                                                            <Badge className="shrink-0 border-emerald-500/20 bg-emerald-500/10 text-[10px] text-emerald-600 dark:text-emerald-300">
-                                                                Aligned
-                                                            </Badge>
-                                                        ) : (
-                                                            <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
-                                                                {value}%
-                                                            </span>
-                                                        )}
+                                                        <Badge
+                                                            variant="secondary"
+                                                            title={leaningTag}
+                                                            className="max-w-[42%] shrink-0 truncate border-border/50 bg-muted/50 text-[10px] font-medium text-muted-foreground"
+                                                        >
+                                                            {leaningTag}
+                                                        </Badge>
                                                         <span className="truncate text-right text-muted-foreground">
                                                             {question.right}
                                                         </span>
@@ -686,24 +693,13 @@ export function UserProfile() {
                                                             className={`absolute inset-y-0 left-0 rounded-full bg-gradient-to-r ${trackClass}`}
                                                             style={{ width: `${value}%` }}
                                                         />
-                                                        {ownValue !== null && (
-                                                            <div
-                                                                className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-background bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.7)]"
-                                                                style={{ left: `${ownValue}%` }}
-                                                                title="Your position"
-                                                            />
-                                                        )}
                                                         <div
+                                                            data-testid={`profile-question-pin-${question.key}`}
+                                                            data-value={value}
                                                             className={`absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background shadow-lg ${pinClass}`}
                                                             style={{ left: `${value}%` }}
                                                         />
                                                     </div>
-
-                                                    {aligned && (
-                                                        <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-300">
-                                                            Shared compatibility field
-                                                        </p>
-                                                    )}
                                                 </div>
                                             );
                                         })}

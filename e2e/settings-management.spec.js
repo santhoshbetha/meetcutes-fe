@@ -303,12 +303,12 @@ test.describe("settings management", () => {
     await openSettings(page, profile);
 
     const switches = page.getByRole("switch");
-    await expect(switches).toHaveCount(4);
+    await expect(switches).toHaveCount(5);
 
-    const expectedInitial = [true, false, true, false];
-    const expectedAfter = [false, true, false, true];
+    const expectedInitial = [true, false, true, false, false];
+    const expectedAfter = [false, true, false, true, true];
 
-    for (let index = 0; index < 4; index += 1) {
+    for (let index = 0; index < 5; index += 1) {
       await expect(switches.nth(index)).toHaveAttribute(
         "aria-checked",
         String(expectedInitial[index]),
@@ -343,6 +343,7 @@ test.describe("settings management", () => {
       phonenumbersearch: true,
       userhandlesearch: false,
       onlyhundredmileevisiblity: true,
+      hide_last_name: true,
       visibilitypreference: "both",
     });
 

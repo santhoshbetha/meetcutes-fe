@@ -78,7 +78,7 @@ export default function AboutSection() {
                       <h3 className="text-lg font-semibold text-foreground mb-2">Local Events</h3>
                       <div className="text-muted-foreground leading-relaxed">
                         Turn your shopping events into happenstances to meet someone.
-                        People who are willing to be approached may schedule and/or
+                        People who are willing to be approached may create and/or
                         attend events in your area to find someone. Grocery
                         shopping/cloths shopping or any other.
                       </div>

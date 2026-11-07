@@ -1,5 +1,16 @@
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+
+function leaningLabel(value) {
+  const rounded = Math.round(Number(value) || 0);
+
+  if (rounded <= 15) return "Strongly lean left";
+  if (rounded <= 40) return "Slightly lean left";
+  if (rounded <= 59) return "Neutral / Balanced";
+  if (rounded <= 84) return "Slightly lean right";
+  return "Strongly lean right";
+}
 
 function QuestionSlider({ question, value, onChange, disabled }) {
   const currentValue = Number.isFinite(Number(value))
@@ -29,11 +40,9 @@ function QuestionSlider({ question, value, onChange, disabled }) {
           {question.right}
         </span>
       </div>
-      <div className="mt-1 flex justify-center">
-        <span className="rounded-full bg-muted/50 px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
-          {Math.round(currentValue)}
-        </span>
-      </div>
+      <p className="text-xs text-muted-foreground/80 font-medium italic mt-1 text-center block">
+        {leaningLabel(currentValue)}
+      </p>
     </div>
   );
 }
@@ -78,15 +87,71 @@ export function QuestionnaireSection({
         </div>
       ) : (
         <div className="space-y-6">
-          {section.questions.map((question) => (
-            <QuestionSlider
-              key={question.key}
-              question={question}
-              value={values[question.key]}
-              onChange={onChange}
-              disabled={disabled}
-            />
-          ))}
+          {section.questions.map((question) => {
+            const currentValue = values[question.key];
+            const isSkippedOptional =
+              question.optional &&
+              (currentValue === null ||
+                currentValue === undefined ||
+                currentValue === "");
+
+            if (isSkippedOptional) {
+              return (
+                <div
+                  key={question.key}
+                  data-testid={`questionnaire-question-${question.key}`}
+                >
+                  <div className="grid grid-cols-12 items-center gap-2">
+                    <span className="col-span-3 text-sm font-medium text-foreground/80 sm:col-span-2">
+                      {question.left}
+                    </span>
+                    <span className="col-span-6 text-center text-xs italic text-muted-foreground sm:col-span-8">
+                      Skipped
+                    </span>
+                    <span className="col-span-3 text-right text-sm font-medium text-foreground/80 sm:col-span-2">
+                      {question.right}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex justify-center">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        onChange(question.key, question.defaultValue ?? 50)
+                      }
+                    >
+                      Answer this question
+                    </Button>
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <div key={question.key}>
+                <QuestionSlider
+                  question={question}
+                  value={currentValue}
+                  onChange={onChange}
+                  disabled={disabled}
+                />
+                {question.optional && (
+                  <div className="-mt-1 flex justify-center">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-muted-foreground"
+                      onClick={() => onChange(question.key, null)}
+                    >
+                      Skip this question
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </section>

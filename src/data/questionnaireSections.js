@@ -40,27 +40,23 @@ export const QUESTIONNAIRE_SECTIONS = [
     description: "Slide options toward the direction your thoughts align.",
     questions: [
       sharedQuestion("q1", "Android", "iPhone"),
-      genderedQuestion(
-        "q2",
-        ["Capitalism", "Equal Opportunities"],
-        ["Trader Joe's", "ALDI/WINCO"],
-      ),
+      {
+        ...sharedQuestion("q2", "Trader Joe's", "ALDI/WINCO"),
+        audiences: ["female"],
+      },
       genderedQuestion("q3", ["Truck", "BMW"], ["Tesla", "Toyota"]),
-      genderedQuestion(
-        "q4",
-        ["Socialism", "Pyramid Scheme"],
-        ["Costco", "Whole Foods"],
-      ),
-      genderedQuestion(
-        "q5",
-        ["Modern Family", "Traditional Family"],
-        ["Woman Rights", "Transwoman is woman"],
-      ),
-      genderedQuestion(
-        "q6",
-        ["Suit/Formal dress", "Jeans and T-shirt"],
-        ["Pro-Choice", "Pro-Life"],
-      ),
+      {
+        ...sharedQuestion("q4", "Costco", "Whole Foods"),
+        audiences: ["female"],
+      },
+      {
+        ...sharedQuestion("q5", "Modern Family", "Traditional Family"),
+        audiences: ["male"],
+      },
+      {
+        ...sharedQuestion("q6", "Suit/Formal dress", "Jeans and T-shirt"),
+        audiences: ["male"],
+      },
       genderedQuestion(
         "q7",
         ["Partner", "Title Wife"],
@@ -100,6 +96,33 @@ export const QUESTIONNAIRE_SECTIONS = [
       {
         ...sharedQuestion("q14", "Dog Mom/Cat Mom", "Pet Owner"),
         audiences: ["female"],
+      },
+    ],
+  },
+  {
+    id: "optional",
+    title: "Optional",
+    description:
+      "Answer only if you want to. You can skip this question and it will not appear on your profile.",
+    questions: [
+      {
+        ...sharedQuestion("q2_optional", "Capitalism", "Equal Opportunities"),
+        audiences: ["male"],
+        optional: true,
+      },
+      {
+        ...sharedQuestion("q4_optional", "Socialism", "Pyramid Scheme"),
+        audiences: ["male"],
+        optional: true,
+      },
+      {
+        ...sharedQuestion("q6_optional", "Pro-Choice", "Pro-Life"),
+        audiences: ["female"],
+        optional: true,
+      },
+      {
+        ...sharedQuestion("q15_optional", "Capitalism", "Socialism"),
+        optional: true,
       },
     ],
   },
@@ -163,7 +186,9 @@ export function createInitialQuestionnaireValues() {
 
   QUESTIONNAIRE_SECTIONS.forEach((section) => {
     (section.questions ?? []).forEach((question) => {
-      values[question.key] = question.defaultValue ?? DEFAULT_QUESTION_VALUE;
+      values[question.key] = question.optional
+        ? null
+        : (question.defaultValue ?? DEFAULT_QUESTION_VALUE);
     });
 
     nestedValueKeys(section).forEach((key) => {
@@ -212,6 +237,14 @@ export function hydrateQuestionnaireValues(baseValues, savedValues) {
     }
 
     if (key in next) {
+      if (
+        next[key] === null &&
+        (rawValue === null || rawValue === undefined || rawValue === "")
+      ) {
+        next[key] = null;
+        return;
+      }
+
       next[key] = normalizeQuestionValue(rawValue, currentValue);
     }
   });
@@ -230,8 +263,17 @@ export function buildQuestionnairePayload(formValues, audience) {
 
   QUESTIONNAIRE_SECTIONS.forEach((section) => {
     getQuestionsForAudience(section, audience).forEach((question) => {
+      const rawValue = formValues[question.key];
+
+      if (
+        question.optional &&
+        (rawValue === null || rawValue === undefined || rawValue === "")
+      ) {
+        return;
+      }
+
       payload[question.key] = normalizeQuestionValue(
-        formValues[question.key],
+        rawValue,
         question.defaultValue ?? DEFAULT_QUESTION_VALUE,
       );
     });
