@@ -1,0 +1,17 @@
+node_modules
+dist
+dist-ssr
+.git
+.vscode
+.wrangler
+test-results
+playwright-report
+blob-report
+playwright
+e2e
+playwright.config.js
+npm-debug.log*
+*.local
+.env
+.env.*
+!.env.example

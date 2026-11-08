@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Spinner } from "@/components/ui/Spinner"
+import { Spinner } from "@/components/ui/spinner"
 import { MeetCutesSpinner } from "@/components/ui/MeetCutesSpinner"
 import { useNavigate, Link } from "react-router-dom";
 import { Input } from "@/components/ui/input";

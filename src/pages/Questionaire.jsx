@@ -5,7 +5,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/LoadingButton";
-import { Spinner } from "@/components/ui/Spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { QuestionnaireSection } from "@/components/questionnaire/QuestionnaireSection";
 import { useAuth } from "@/context/AuthContext";
 import { useUpdateProfileMutation } from "@/hooks/useProfileQueries";

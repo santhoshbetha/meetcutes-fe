@@ -6,7 +6,7 @@ import { Check, Edit2, Eye, Link2, Mail, MapPin, Phone, RotateCcw, Save, Setting
 import { FaFacebook, FaInstagram, FaLinkedin } from "react-icons/fa";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Spinner } from '@/components/ui/Spinner';
+import { Spinner } from '@/components/ui/spinner';
 import { Editable } from "@/components/Editable";
 import { EditableBio } from "@/components/EditableBio";
 import { useAuth } from "@/context/AuthContext";

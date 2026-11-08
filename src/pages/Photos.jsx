@@ -9,7 +9,7 @@ import {
   useUploadProfileImageMutation,
 } from '@/hooks/useProfileQueries';
 import { ImageUploader } from '@/components/ImageUploader';
-import { Spinner } from '@/components/ui/Spinner';
+import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import { describeApiError } from '@/lib/api';
 import { validateProfileImage } from '@/lib/imageValidation';
