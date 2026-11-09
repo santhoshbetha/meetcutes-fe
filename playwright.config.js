@@ -46,6 +46,8 @@ export default defineConfig({
         STRIPE_WEBHOOK_SECRET: "whsec_e2e_paywall_test",
         INVOICE_STORAGE: "local",
         RATE_LIMIT_ENABLED: "false",
+        // Email links must resolve to the verified production client domain.
+        FRONTEND_URL: "https://meetcutes.us",
       },
     },
     {
