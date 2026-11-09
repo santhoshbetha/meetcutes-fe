@@ -236,26 +236,7 @@ export const checkEventFatigue = async (eventId) => {
  */
 export const createEvent = async (dataIn = {}) => {
   try {
-    const payload = await api.post("/api/v1/events", {
-      title: dataIn?.title,
-      location: dataIn?.location,
-      locationid: dataIn?.locationid,
-      address1: dataIn?.address1,
-      city: dataIn?.city,
-      state: dataIn?.state,
-      zipcode: dataIn?.zipcode,
-      eventlat: dataIn?.eventlat,
-      eventlng: dataIn?.eventlng,
-      eventdate: dataIn?.eventdate,
-      start_time: dataIn?.start_time,
-      end_time: dataIn?.end_time,
-      description: dataIn?.description,
-      has_age_restriction: dataIn?.has_age_restriction ?? false,
-      men_min_age: dataIn?.men_min_age ?? null,
-      men_max_age: dataIn?.men_max_age ?? null,
-      women_min_age: dataIn?.women_min_age ?? null,
-      women_max_age: dataIn?.women_max_age ?? null,
-    });
+    const payload = await api.post("/api/v1/events", eventPayload(dataIn));
 
     return {
       success: true,
@@ -265,6 +246,67 @@ export const createEvent = async (dataIn = {}) => {
     return toApiError(error);
   }
 };
+
+/**
+ * Updates an owned event. The backend enforces creator ownership and notifies
+ * every registered attendee atomically.
+ */
+export const updateEvent = async (eventId, dataIn = {}) => {
+  try {
+    const payload = await api.patch(
+      `/api/v1/events/${encodeURIComponent(eventId)}`,
+      eventPayload(dataIn),
+    );
+
+    return {
+      success: true,
+      data: toLegacyEvent(payload?.data?.event),
+    };
+  } catch (error) {
+    return toApiError(error);
+  }
+};
+
+/**
+ * Cancels an owned event and notifies every registered attendee.
+ */
+export const cancelEvent = async (eventId) => {
+  try {
+    const payload = await api.delete(
+      `/api/v1/events/${encodeURIComponent(eventId)}`,
+    );
+
+    return {
+      success: true,
+      data: toLegacyEvent(payload?.data?.event),
+    };
+  } catch (error) {
+    return toApiError(error);
+  }
+};
+
+function eventPayload(dataIn = {}) {
+  return {
+    title: dataIn?.title,
+    location: dataIn?.location,
+    locationid: dataIn?.locationid,
+    address1: dataIn?.address1,
+    city: dataIn?.city,
+    state: dataIn?.state,
+    zipcode: dataIn?.zipcode ?? dataIn?.zip,
+    eventlat: dataIn?.eventlat,
+    eventlng: dataIn?.eventlng,
+    eventdate: dataIn?.eventdate,
+    start_time: dataIn?.start_time ?? dataIn?.startTime,
+    end_time: dataIn?.end_time ?? dataIn?.endTime,
+    description: dataIn?.description,
+    has_age_restriction: dataIn?.has_age_restriction ?? false,
+    men_min_age: dataIn?.men_min_age ?? null,
+    men_max_age: dataIn?.men_max_age ?? null,
+    women_min_age: dataIn?.women_min_age ?? null,
+    women_max_age: dataIn?.women_max_age ?? null,
+  };
+}
 
 /**
  * Joins an event as the signed-in user.

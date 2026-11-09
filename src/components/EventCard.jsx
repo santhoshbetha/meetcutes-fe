@@ -1,6 +1,7 @@
 import { useMemo } from "react";
-import { Clock, Calendar, MapPin, Users } from "lucide-react";
+import { Clock, Calendar, MapPin, Users, Pencil, Trash } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { haversine } from "../utils/util";
 import dayjs from "dayjs";
 
@@ -51,6 +52,9 @@ export function EventCard({
   userlatitude,
   userlongitude,
   profiledata,
+  showOwnerActions = false,
+  onEdit,
+  onDelete,
 }) {
   const handles = useMemo(() => attendeeHandles(event), [event]);
   const registeredIds = useMemo(() => registeredAttendeeIds(event), [event]);
@@ -165,10 +169,44 @@ export function EventCard({
             <Users className="w-3 h-3" />
             <span>{attendingCount} attending</span>
           </div>
-          <div className="px-2 py-1 bg-linear-to-r from-primary/20 to-primary/10 rounded-md border border-primary/20">
-            <p className="text-xs font-bold text-primary">
-              {distance.toFixed(1)} mi
-            </p>
+          <div className="flex items-center gap-2">
+            {showOwnerActions && (
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 rounded-xl bg-background/60 text-muted-foreground shadow-xs hover:bg-amber-50 hover:text-amber-900 dark:hover:bg-amber-950/30 dark:hover:text-amber-200"
+                  title="Edit event"
+                  aria-label={`Edit ${event?.title || "event"}`}
+                  onClick={(clickEvent) => {
+                    clickEvent.stopPropagation();
+                    onEdit?.(event);
+                  }}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 rounded-xl bg-background/60 text-muted-foreground shadow-xs hover:bg-destructive/10 hover:text-destructive"
+                  title="Cancel event"
+                  aria-label={`Delete ${event?.title || "event"}`}
+                  onClick={(clickEvent) => {
+                    clickEvent.stopPropagation();
+                    onDelete?.(event);
+                  }}
+                >
+                  <Trash className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            )}
+            <div className="px-2 py-1 bg-linear-to-r from-primary/20 to-primary/10 rounded-md border border-primary/20">
+              <p className="text-xs font-bold text-primary">
+                {distance.toFixed(1)} mi
+              </p>
+            </div>
           </div>
         </div>
       </div>

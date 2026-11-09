@@ -32,6 +32,7 @@ import { toast } from "sonner";
 import { coords } from "@/lib/defaultcoords";
 import { cities } from "@/lib/cities"
 import { useRegisterMutation } from "@/hooks/useAuthQueries";
+import { useAuthStore } from "@/stores/authStore";
 import { describeApiError } from "@/lib/api";
 import { Eye, Users, Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -139,6 +140,9 @@ export function Signup({ setOpenSignup, setOpenLogin }) {
   const doRegister = async (values, actions) => {
     try {
       setLoading(true);
+      // Prevent the landing page's signed-in redirect from racing the
+      // registration -> onboarding handoff. The onboarding step clears it.
+      useAuthStore.getState().setOnboardingInProgress(true);
 
       const selectedBirthDate =
         dobDate === "" ? new Date("2002-01-01") : new Date(dobDate);
@@ -174,11 +178,21 @@ export function Signup({ setOpenSignup, setOpenLogin }) {
 
       const result = await registerMutation.mutateAsync(payload);
 
-      navigate("/registration-success", { state: { email: result.email } });
+      // When the API issues a session immediately, continue straight into the
+      // onboarding wizard. Confirmation-first environments still land on the
+      // registration-success screen.
+      if (result.token) {
+        navigate("/onboarding/location");
+      } else {
+        useAuthStore.getState().setOnboardingInProgress(false);
+        navigate("/registration-success", { state: { email: result.email } });
+        toast.success("Check your email to confirm your account.");
+      }
+
       toast.success("Signup successful!");
-      toast.success("Check your email to confirm your account.");
       setOpenSignup(false);
     } catch (error) {
+      useAuthStore.getState().setOnboardingInProgress(false);
       toast.error(
         describeApiError(error, "Signup failed. Please try again."),
       );
@@ -208,27 +222,35 @@ export function Signup({ setOpenSignup, setOpenLogin }) {
     },
     validationSchema: Yup.object({
       firstname: Yup.string()
-        .min(3, "Too Short! (min 3 characters)")
-        .max(20, "Too Long! (max 20 characters)")
-        .required("Required"),
+        .required("First name is required")
+        .min(3, "First name must be at least 3 characters")
+        .max(20, "First name must be at most 20 characters"),
       lastname: Yup.string()
-        .min(3, "Too Short! (min 3 characters)")
-        .max(40, "Too Long! (max 40 characters)")
-        .required("Required"),
+        .required("Last name is required")
+        .min(3, "Last name must be at least 3 characters")
+        .max(40, "Last name must be at most 40 characters"),
       phonenumber: Yup.string()
-        .matches(/^\d{0,10}$/, "Must be only digits (10 digits required)")
-        .test('len', 'Must be exactly 10 digits', val => val && val.length === 10)
-        .required("required"),
-      email: Yup.string().email().required("Required"),
+        .required("Phone number is required")
+        .matches(/^\d{0,10}$/, "Phone number must contain only digits")
+        .test(
+          "len",
+          "Phone number must be exactly 10 digits",
+          (value) => value && value.length === 10,
+        ),
+      email: Yup.string()
+        .email("Enter a valid email address")
+        .required("Email is required"),
       password: Yup.string()
-        .min(12, "Too Short! (min 12 characters)")
-        .required("Required"),
-      state: Yup.string().required("Required"),
-      city: Yup.string().required("Required"),
-      ethnicity: Yup.string().required("Required"),
+        .min(8, "Password must be at least 8 characters")
+        .required("Password is required"),
+      gender: Yup.string().required("Gender is required"),
+      state: Yup.string().required("State is required"),
+      city: Yup.string().required("City is required"),
+      ethnicity: Yup.string().required("Ethnicity is required"),
     }),
 
     onSubmit,
+    validateOnBlur: false,
   });
 
   // Reset form when component mounts (every time signup dialog opens)
@@ -274,7 +296,7 @@ export function Signup({ setOpenSignup, setOpenLogin }) {
           </CardDescription>
         </CardHeader>
         <CardContent className="w-[95%] mt-4 px-8 pb-8">
-          <form onSubmit={formik.handleSubmit}>
+          <form noValidate onSubmit={formik.handleSubmit}>
             <div className="flex flex-col gap-6">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
                 <div className="grid gap-2 w-full">
@@ -293,7 +315,7 @@ export function Signup({ setOpenSignup, setOpenLogin }) {
                     }}
                     onBlur={formik.handleBlur}
                   />
-                  {formik.touched.firstname && formik.errors.firstname ? (
+                  {(formik.touched.firstname || formik.submitCount > 0) && formik.errors.firstname ? (
                     <p className="text-red-700">{formik.errors.firstname} </p>
                   ) : null}
                 </div>
@@ -313,7 +335,7 @@ export function Signup({ setOpenSignup, setOpenLogin }) {
                     }}
                     onBlur={formik.handleBlur}
                   />
-                  {formik.touched.lastname && formik.errors.lastname ? (
+                  {(formik.touched.lastname || formik.submitCount > 0) && formik.errors.lastname ? (
                     <p className="text-red-700">{formik.errors.lastname} </p>
                   ) : null}
                 </div>
@@ -324,9 +346,9 @@ export function Signup({ setOpenSignup, setOpenLogin }) {
                   <Label htmlFor="gender">Gender</Label>
                   <Select
                     required
-                    onValueChange={(value) => {
-                      formik.values.gender = value;
-                    }}
+                    onValueChange={(value) =>
+                      formik.setFieldValue("gender", value, true)
+                    }
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select your gender" />
@@ -338,6 +360,9 @@ export function Signup({ setOpenSignup, setOpenLogin }) {
                       </SelectGroup>
                     </SelectContent>
                   </Select>
+                  {(formik.touched.gender || formik.submitCount > 0) && formik.errors.gender ? (
+                    <p className="text-red-700">{formik.errors.gender}</p>
+                  ) : null}
                 </div>
                 <div className="grid gap-2 w-full">
                   <Label htmlFor="dob">Date of Birth</Label>
@@ -428,10 +453,10 @@ export function Signup({ setOpenSignup, setOpenLogin }) {
                     options={stateComboboxOptions}
                     value={state}
                     onValueChange={(value) => {
-                      formik.values.state = value;
-                      formik.setFieldTouched('state', true);
-                      formik.values.city = ""; // Clear city when state changes
-                      setSelectedCity(""); // Clear local city state
+                      formik.setFieldValue("state", value, true);
+                      formik.setFieldTouched("state", true);
+                      formik.setFieldValue("city", "");
+                      setSelectedCity("");
                       setState(value);
                     }}
                     onOpenChange={(open) => {
@@ -442,7 +467,7 @@ export function Signup({ setOpenSignup, setOpenLogin }) {
                     emptyMessage="No states found."
                     className="w-full"
                   />
-                  {formik.touched.state && formik.errors.state ? (
+                  {(formik.touched.state || formik.submitCount > 0) && formik.errors.state ? (
                     <p className="text-red-700">{formik.errors.state}</p>
                   ) : null}
                 </div>
@@ -453,8 +478,8 @@ export function Signup({ setOpenSignup, setOpenLogin }) {
                     value={selectedCity}
                     onValueChange={(value) => {
                       setSelectedCity(value);
-                      formik.values.city = value;
-                      formik.setFieldTouched('city', true);
+                      formik.setFieldValue("city", value, true);
+                      formik.setFieldTouched("city", true);
                     }}
                     onOpenChange={(open) => {
                       if (open) formik.setFieldTouched('city', true);
@@ -465,7 +490,7 @@ export function Signup({ setOpenSignup, setOpenLogin }) {
                     className="w-full"
                     disabled={!state}
                   />
-                  {formik.touched.city && formik.errors.city ? (
+                  {(formik.touched.city || formik.submitCount > 0) && formik.errors.city ? (
                     <p className="text-red-700">{formik.errors.city}</p>
                   ) : null}
                 </div>
@@ -499,7 +524,7 @@ export function Signup({ setOpenSignup, setOpenLogin }) {
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-                {formik.touched.ethnicity && formik.errors.ethnicity ? (
+                {(formik.touched.ethnicity || formik.submitCount > 0) && formik.errors.ethnicity ? (
                   <p className="text-red-700">{formik.errors.ethnicity}</p>
                 ) : null}
               </div>
@@ -517,7 +542,7 @@ export function Signup({ setOpenSignup, setOpenLogin }) {
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
                 />
-                {formik.touched.phonenumber && formik.errors.phonenumber ? (
+                {(formik.touched.phonenumber || formik.submitCount > 0) && formik.errors.phonenumber ? (
                   <p className="text-red-700">{formik.errors.phonenumber} </p>
                 ) : null}
               </div>
@@ -534,7 +559,7 @@ export function Signup({ setOpenSignup, setOpenLogin }) {
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
                 />
-                {formik.touched.email && formik.errors.email ? (
+                {(formik.touched.email || formik.submitCount > 0) && formik.errors.email ? (
                   <p className="text-red-700">{formik.errors.email} </p>
                 ) : null}
               </div>
@@ -568,7 +593,7 @@ export function Signup({ setOpenSignup, setOpenLogin }) {
                     {ToggleIcon}
                   </span>
                 </div>
-                {formik.touched.password && formik.errors.password ? (
+                {(formik.touched.password || formik.submitCount > 0) && formik.errors.password ? (
                   <p className="text-red-700">{formik.errors.password} </p>
                 ) : null}
               </div>

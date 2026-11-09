@@ -7,6 +7,7 @@ const loadDonate = () => import("@/pages/Donate");
 const loadSearch = () => import("@/pages/Search");
 const loadPhotos = () => import("@/pages/Photos");
 const loadQuestionaire = () => import("@/pages/Questionaire");
+const loadOnboardingLocation = () => import("@/pages/onboarding/OnboardingLocation");
 const loadDashboard = () => import("@/pages/dashboard/Dashboard");
 const loadChangePassword = () => import("@/pages/ChangePassword");
 const loadForgotPassword = () => import("@/pages/ForgotPassword");
@@ -34,6 +35,7 @@ const Donate = lazy(() => loadDonate().then(module => ({ default: module.Donate 
 const Search = lazy(() => loadSearch().then(module => ({ default: module.Search })));
 const Photos = lazy(() => loadPhotos());
 const Questionaire = lazy(() => loadQuestionaire());
+const OnboardingLocation = lazy(() => loadOnboardingLocation());
 const Dashboard = lazy(() => loadDashboard().then(module => ({ default: module.Dashboard })));
 const ChangePassword = lazy(() => loadChangePassword().then(module => ({ default: module.ChangePassword })));
 const ForgotPassword = lazy(() => loadForgotPassword().then(module => ({ default: module.ForgotPassword })));
@@ -244,6 +246,8 @@ function App() {
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/search" element={<Search />} />
               <Route path="/questionaire" element={<Questionaire />} />
+              <Route path="/questionnaire" element={<Questionaire />} />
+              <Route path="/onboarding/location" element={<OnboardingLocation />} />
 
               <Route path="/photos" element={<Photos />} />
 

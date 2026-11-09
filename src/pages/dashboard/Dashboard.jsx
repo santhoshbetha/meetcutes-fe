@@ -85,7 +85,9 @@ export function Dashboard({ userProfileMode = false }) {
       ? "users"
       : pathname === "/dashboard/events"
         ? "search"
-        : null;
+        : pathname === "/dashboard/search"
+          ? "search"
+          : null;
   const [activeTab, setActiveTab] = useState(
     searchParams.get('tab') || pathTab || "profile",
   );

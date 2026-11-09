@@ -97,7 +97,7 @@ export default function Questionaire() {
       });
 
       successAlert("", "Questionnaire submitted successfully!");
-      navigate("/dashboard");
+      navigate("/dashboard/search");
     } catch (error) {
       errorAlert("Error", error?.message || "Failed to submit questionnaire.");
     } finally {
@@ -215,6 +215,7 @@ export default function Questionaire() {
               <div className="flex flex-row mt-3" hidden={!valueschanged}>
                 <Button
                   type="submit"
+                  data-testid="questionnaire-submit"
                   className="ms-auto me-2"
                   disabled={loading}
                 >

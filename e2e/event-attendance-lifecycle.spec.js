@@ -1,6 +1,13 @@
 import dayjs from "dayjs";
 import { test, expect } from "@playwright/test";
-import { mockEmptyNotificationInbox } from "./helpers.js";
+import {
+  mockEmptyNotificationInbox,
+  apiLogin,
+  API_URL,
+  authHeaders,
+  login,
+  USERS,
+} from "./helpers.js";
 
 /**
  * Stateful attendance lifecycle coverage.
@@ -66,7 +73,10 @@ const respond = (route, body, status = 200) =>
     body: JSON.stringify(body),
   });
 
-async function setupAttendanceHarness(page, { preRegistered = [] } = {}) {
+async function setupAttendanceHarness(
+  page,
+  { preRegistered = [], createdEvents = [] } = {},
+) {
   const tomorrow = dayjs().add(1, "day").format("YYYY-MM-DD");
   const viewerAttendee = {
     id: PROFILE.id,
@@ -89,6 +99,8 @@ async function setupAttendanceHarness(page, { preRegistered = [] } = {}) {
   const calls = {
     joins: [],
     leaves: [],
+    updates: [],
+    deletes: [],
     searches: 0,
   };
 
@@ -134,6 +146,12 @@ async function setupAttendanceHarness(page, { preRegistered = [] } = {}) {
     eventPayload(FULL_EVENT_ID, FULL_EVENT_TITLE),
     eventPayload(RESTRICTED_EVENT_ID, RESTRICTED_EVENT_TITLE),
   ];
+
+  const createdEventsState = createdEvents.map((event) => ({
+    ...eventPayload(event.id, event.title ?? "Created Event"),
+    ...event,
+    created_by: PROFILE.id,
+  }));
 
   await mockEmptyNotificationInbox(page);
 
@@ -234,12 +252,89 @@ async function setupAttendanceHarness(page, { preRegistered = [] } = {}) {
       }
     }
 
-    if (path.endsWith("/created") || path.endsWith("/joined")) {
-      const events = path.endsWith("/joined")
-        ? eventList().filter(
-            (event) => (attendeesByEvent.get(event.id) ?? []).length > 0,
-          )
-        : [];
+    if (method === "PATCH" && path.startsWith("/api/v1/events/")) {
+      const eventId = path.split("/").at(-1);
+      const body = request.postDataJSON() ?? {};
+      calls.updates.push({ method, eventId, body });
+
+      const index = createdEventsState.findIndex(
+        (event) => String(event.id) === String(eventId),
+      );
+
+      if (index === -1) {
+        return respond(route, { status: "error", message: "Event not found" }, 404);
+      }
+
+      const current = createdEventsState[index];
+      const eventDate = body.eventdate ?? current.event_date;
+      const startTime = body.start_time ?? "08:00";
+      const endTime = body.end_time ?? "09:00";
+
+      const updated = {
+        ...current,
+        title: body.title ?? current.title,
+        content: body.description ?? current.content,
+        event_date: eventDate,
+        start_at: `${eventDate}T${startTime}:00Z`,
+        end_at: `${eventDate}T${endTime}:00Z`,
+        location: {
+          ...current.location,
+          name: body.location ?? current.location?.name,
+          street: body.address1 ?? current.location?.street,
+          locality: body.city ?? current.location?.locality,
+          state: body.state ?? current.location?.state,
+          postal_code: body.zipcode ?? current.location?.postal_code,
+        },
+      };
+
+      createdEventsState[index] = updated;
+      return respond(route, { status: "success", data: { event: updated } });
+    }
+
+    if (method === "DELETE" && path.startsWith("/api/v1/events/")) {
+      const eventId = path.split("/").at(-1);
+      calls.deletes.push({ method, eventId });
+
+      const index = createdEventsState.findIndex(
+        (event) => String(event.id) === String(eventId),
+      );
+
+      if (index === -1) {
+        return respond(route, { status: "error", message: "Event not found" }, 404);
+      }
+
+      createdEventsState[index] = {
+        ...createdEventsState[index],
+        status: "CANCELLED",
+        attendees: [],
+      };
+
+      return respond(route, {
+        status: "success",
+        message: "Event canceled",
+        data: { event: createdEventsState[index] },
+      });
+    }
+
+    if (path.endsWith("/created")) {
+      return respond(route, {
+        status: "success",
+        data: {
+          events: createdEventsState,
+          pagination: {
+            total: createdEventsState.length,
+            limit: 20,
+            offset: 0,
+            has_more: false,
+          },
+        },
+      });
+    }
+
+    if (path.endsWith("/joined")) {
+      const events = eventList().filter(
+        (event) => (attendeesByEvent.get(event.id) ?? []).length > 0,
+      );
 
       return respond(route, { status: "success", data: { events } });
     }
@@ -552,5 +647,179 @@ test.describe("event attendance lifecycle", () => {
     await expect(page.getByLabel(R_BADGE_LABEL)).toHaveCount(0, {
       timeout: 30_000,
     });
+  });
+
+  test("editing a created event updates the venue in the grid", async ({
+    page,
+  }) => {
+    const createdEvent = {
+      id: "lifecycle-created-event",
+      title: "Lifecycle Created Event",
+    };
+
+    const harness = await setupAttendanceHarness(page, {
+      createdEvents: [createdEvent],
+    });
+
+    await page.getByRole("button", { name: /My Events/ }).click();
+    await expect(page).toHaveURL(/tab=events/);
+    await page.getByRole("tab", { name: /Events You Created/ }).click();
+
+    await expect(page.getByText(createdEvent.title)).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByText("Attendance Test Venue")).toBeVisible();
+
+    await page
+      .getByRole("button", { name: `Edit ${createdEvent.title}` })
+      .click();
+
+    await expect(page.getByTestId("edit-event-form")).toBeVisible();
+    await expect(page.getByLabel("Venue/Location Name")).toHaveValue(
+      "Attendance Test Venue",
+    );
+
+    await page
+      .getByLabel("Venue/Location Name")
+      .fill("Updated Lifecycle Venue");
+    await page.getByTestId("edit-event-submit").click();
+
+    await expect(page.getByText("Updated Lifecycle Venue")).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByText("Attendance Test Venue")).toHaveCount(0);
+
+    expect(harness.calls.updates).toHaveLength(1);
+    expect(harness.calls.updates[0].eventId).toBe(createdEvent.id);
+    expect(harness.calls.updates[0].body.location).toBe(
+      "Updated Lifecycle Venue",
+    );
+  });
+
+  test("canceling a created event confirms first and removes the card", async ({
+    page,
+  }) => {
+    const createdEvent = {
+      id: "lifecycle-delete-event",
+      title: "Lifecycle Delete Event",
+    };
+
+    const harness = await setupAttendanceHarness(page, {
+      createdEvents: [createdEvent],
+    });
+
+    await page.getByRole("button", { name: /My Events/ }).click();
+    await page.getByRole("tab", { name: /Events You Created/ }).click();
+
+    await expect(page.getByText(createdEvent.title)).toBeVisible({
+      timeout: 20_000,
+    });
+
+    await page
+      .getByRole("button", { name: `Delete ${createdEvent.title}` })
+      .click();
+
+    const dialog = page.getByTestId("cancel-event-dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText(
+      "Are you sure you want to cancel this event? This action cannot be undone and will automatically notify all registered attendees.",
+    );
+
+    await page.getByRole("button", { name: "Cancel Event" }).click();
+
+    await expect(page.getByText(createdEvent.title)).toHaveCount(0, {
+      timeout: 20_000,
+    });
+    expect(harness.calls.deletes).toHaveLength(1);
+    expect(harness.calls.deletes[0].eventId).toBe(createdEvent.id);
+  });
+
+  test("event edits notify a registered attendee over the real socket", async ({
+    page,
+    request,
+  }) => {
+    const ownerToken = await apiLogin(request, USERS.viewer.email);
+    const attendeeToken = await apiLogin(request, USERS.blockTarget.email);
+    const title = `Lifecycle Notify ${Date.now()}`;
+    const eventDate = dayjs().add(10, "day").format("YYYY-MM-DD");
+    const eventLocation = `Lifecycle Venue ${Date.now()}`;
+
+    const createResponse = await request.post(`${API_URL}/api/v1/events`, {
+      headers: authHeaders(ownerToken),
+      data: {
+        title,
+        location: eventLocation,
+        address1: "100 Notify St",
+        city: "Austin",
+        state: "TX",
+        zip: "78701",
+        eventlat: 30.2672,
+        eventlng: -97.7431,
+        eventdate: eventDate,
+        start_time: "08:00",
+        end_time: "10:00",
+        description: "Lifecycle notification coverage",
+      },
+    });
+
+    expect(createResponse.status(), await createResponse.text()).toBe(201);
+    const event = (await createResponse.json()).data.event;
+
+    const joinResponse = await request.post(
+      `${API_URL}/api/v1/events/${event.id}/join`,
+      { headers: authHeaders(attendeeToken) },
+    );
+    expect(joinResponse.ok(), await joinResponse.text()).toBeTruthy();
+
+    await login(page, USERS.blockTarget.email);
+    await page.goto("/notifications");
+
+    await expect(
+      page.getByRole("heading", { name: "Notifications", exact: true }),
+    ).toBeVisible({ timeout: 30_000 });
+
+    await page.waitForFunction(
+      async () => {
+        const { isSocketConnected } = await import("/src/lib/socket.js");
+        return isSocketConnected();
+      },
+      null,
+      { timeout: 20_000 },
+    );
+    await page.waitForTimeout(500);
+
+    const updateResponse = await request.patch(
+      `${API_URL}/api/v1/events/${event.id}`,
+      {
+        headers: authHeaders(ownerToken),
+        data: {
+          title,
+          location: "Updated Lifecycle Venue",
+          address1: "100 Notify St",
+          city: "Austin",
+          state: "TX",
+          zip: "78701",
+          eventlat: 30.2672,
+          eventlng: -97.7431,
+          eventdate: eventDate,
+          start_time: "08:00",
+          end_time: "10:00",
+          description: "Updated lifecycle notification coverage",
+        },
+      },
+    );
+
+    expect(updateResponse.status(), await updateResponse.text()).toBe(200);
+
+    const notificationBody = `Notice: The event '${title}' has updated its logistics (Date/Time or Venue). Please check the event page for details.`;
+    const notificationCard = page
+      .locator("article")
+      .filter({ hasText: notificationBody })
+      .first();
+
+    await expect(notificationCard).toBeVisible({ timeout: 20_000 });
+    await expect(
+      notificationCard.getByRole("link", { name: "View event" }),
+    ).toHaveAttribute("href", `/event/${event.id}`);
   });
 });

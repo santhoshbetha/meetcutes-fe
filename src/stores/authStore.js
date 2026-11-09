@@ -78,6 +78,7 @@ export const useAuthStore = create((set, get) => ({
   profiledata: null,
   profileLoading: false,
   justLoggedIn: false,
+  onboardingInProgress: false,
 
   setToken: (token) => {
     writeStoredToken(token);
@@ -103,6 +104,9 @@ export const useAuthStore = create((set, get) => ({
 
   resetJustLoggedIn: () => set({ justLoggedIn: false }),
 
+  setOnboardingInProgress: (onboardingInProgress) =>
+    set({ onboardingInProgress: Boolean(onboardingInProgress) }),
+
   setSession: ({ token, user = null, profiledata = null }) => {
     writeStoredToken(token);
     writeStoredUser(user);
@@ -118,6 +122,7 @@ export const useAuthStore = create((set, get) => ({
       profiledata: null,
       profileLoading: false,
       justLoggedIn: false,
+      onboardingInProgress: false,
     });
   },
 }));

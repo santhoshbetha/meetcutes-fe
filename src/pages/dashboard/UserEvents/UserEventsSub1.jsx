@@ -2,11 +2,23 @@ import { lazy, Suspense, useState, useEffect, useRef, useMemo } from "react";
 import { Card, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EventList } from "@/components/EventList";
-import { useUserEvents1 } from "@/hooks/useEvents";
+import { useCancelEvent, useUserEvents1 } from "@/hooks/useEvents";
+import { EditEventDialog } from "@/components/EditEventDialog";
 import { isObjEmpty } from "@/utils/util";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Separator } from '@/components/ui/separator';
 import { Plus, Sparkles, RefreshCw, Loader2, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
 
 const CreateEvent = lazy(() => import("@/components/CreateEvent").then((module) => ({ default: module.CreateEvent })));
 
@@ -18,8 +30,11 @@ const CreateEventFallback = () => (
 
 export function UserEventsSub1({ profiledata, userhandle, latitude, longitude, error }) {
   const [createEventOpen, setCreateEventOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
+  const [deletingEvent, setDeletingEvent] = useState(null);
   const [refreshDisabled, setRefreshDisabled] = useState(false);
   const lastRefetchRef = useRef(0);
+  const cancelEventMutation = useCancelEvent();
 
   const {
     isLoading,
@@ -34,7 +49,10 @@ export function UserEventsSub1({ profiledata, userhandle, latitude, longitude, e
   } = useUserEvents1();
 
   const data = useMemo(
-    () => infiniteData?.pages?.flatMap((page) => page?.data ?? []) ?? [],
+    () =>
+      (infiniteData?.pages?.flatMap((page) => page?.data ?? []) ?? []).filter(
+        (event) => event?.status !== "CANCELLED",
+      ),
     [infiniteData],
   );
 
@@ -143,6 +161,9 @@ export function UserEventsSub1({ profiledata, userhandle, latitude, longitude, e
               userlatitude={latitude}
               userlongitude={longitude}
               profiledata={profiledata}
+              showOwnerActions
+              onEditEvent={setEditingEvent}
+              onDeleteEvent={setDeletingEvent}
             />
 
             {hasNextPage && (
@@ -183,6 +204,80 @@ export function UserEventsSub1({ profiledata, userhandle, latitude, longitude, e
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Edit event overlay */}
+      <Dialog
+        open={Boolean(editingEvent)}
+        onOpenChange={(open) => {
+          if (!open) setEditingEvent(null);
+        }}
+      >
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto border border-border bg-card p-0">
+          {editingEvent && (
+            <EditEventDialog
+              event={editingEvent}
+              onClose={() => setEditingEvent(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel/delete confirmation */}
+      <AlertDialog
+        open={Boolean(deletingEvent)}
+        onOpenChange={(open) => {
+          if (!open && !cancelEventMutation.isPending) setDeletingEvent(null);
+        }}
+      >
+        <AlertDialogContent data-testid="cancel-event-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel this event?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to cancel this event? This action cannot be
+              undone and will automatically notify all registered attendees.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelEventMutation.isPending}>
+              Keep Event
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={cancelEventMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(clickEvent) => {
+                clickEvent.preventDefault();
+
+                const eventId = deletingEvent?.eventid || deletingEvent?.id;
+                if (!eventId) return;
+
+                cancelEventMutation.mutate(eventId, {
+                  onSuccess: (result) => {
+                    if (result?.success) {
+                      toast.success(
+                        "Event canceled. Attendees have been notified.",
+                      );
+                      setDeletingEvent(null);
+                    } else {
+                      toast.error(
+                        result?.msg || "Could not cancel this event.",
+                      );
+                    }
+                  },
+                  onError: (cancelError) =>
+                    toast.error(
+                      cancelError?.message || "Could not cancel this event.",
+                    ),
+                });
+              }}
+            >
+              {cancelEventMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              {cancelEventMutation.isPending ? "Canceling..." : "Cancel Event"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

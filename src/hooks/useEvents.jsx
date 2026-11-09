@@ -7,6 +7,8 @@ import {
   unregisterToAnEvent,
   getEventDetails,
   checkEventFatigue,
+  updateEvent,
+  cancelEvent,
 } from "@/services/events.service";
 import {
   useQueryClient,
@@ -125,6 +127,50 @@ export function useUserEvents2() {
     refetchInterval: 3 * (60 * 1000), // 3 min
     refetchOnWindowFocus: false,
     refetchOnMount: false,
+  });
+}
+
+/**
+ * Updates an owned event and refreshes every dashboard/discovery cache.
+ */
+export function useUpdateEvent() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ eventId, data }) => updateEvent(eventId, data),
+    onSuccess: (result, variables) => {
+      if (!result?.success) return;
+
+      queryClient.invalidateQueries({ queryKey: ["events", "created"] });
+      queryClient.invalidateQueries({ queryKey: userEvents1QueryKey() });
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+      queryClient.invalidateQueries({ queryKey: eventsSearchQueryKey() });
+      queryClient.invalidateQueries({ queryKey: ["notifyevents"] });
+      queryClient.invalidateQueries({
+        queryKey: ["eventdetails", variables.eventId],
+      });
+    },
+  });
+}
+
+/**
+ * Cancels an owned event and refreshes every dashboard/discovery cache.
+ */
+export function useCancelEvent() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (eventId) => cancelEvent(eventId),
+    onSuccess: (result, eventId) => {
+      if (!result?.success) return;
+
+      queryClient.invalidateQueries({ queryKey: ["events", "created"] });
+      queryClient.invalidateQueries({ queryKey: userEvents1QueryKey() });
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+      queryClient.invalidateQueries({ queryKey: eventsSearchQueryKey() });
+      queryClient.invalidateQueries({ queryKey: ["notifyevents"] });
+      queryClient.invalidateQueries({ queryKey: ["eventdetails", eventId] });
+    },
   });
 }
 

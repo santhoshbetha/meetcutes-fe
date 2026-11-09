@@ -114,7 +114,15 @@ export async function register(user) {
   );
 
   const profile = mapProfileToLegacy(payload?.data?.user);
-  return { user: profile, email: profile?.email };
+
+  // Confirmation-first environments return no session. When a token is
+  // present, persist it immediately so the onboarding wizard can continue in
+  // the same browser session.
+  if (payload?.token) {
+    applySession({ token: payload.token, profile });
+  }
+
+  return { user: profile, email: profile?.email, token: payload?.token ?? null };
 }
 
 export async function fetchProfile() {

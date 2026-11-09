@@ -7,17 +7,28 @@ import Footer from "@/components/Footer";
 import { GlobalAnnouncementBanner } from "@/components/GlobalAnnouncementBanner";
 import { useAuth } from "../context/AuthContext";
 
+import { useAuthStore } from "@/stores/authStore";
+
 export function Home({ setOpenLogin }) {
-  const {user, profiledata} = useAuth();
+  const { user, profiledata } = useAuth();
+  const onboardingInProgress = useAuthStore(
+    (state) => state.onboardingInProgress,
+  );
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user && profiledata) {
-        navigate('/dashboard')
-    } else {
-        navigate('/')
+    if (!user || !profiledata) {
+      navigate('/');
+      return;
     }
-  }, [user, profiledata, navigate])
+
+    // The signup flow owns routing until its onboarding step mounts.
+    if (onboardingInProgress) {
+      return;
+    }
+
+    navigate('/dashboard');
+  }, [user, profiledata, onboardingInProgress, navigate])
 
   return (
     <div>
