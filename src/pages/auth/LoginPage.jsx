@@ -207,7 +207,7 @@ export function LoginPage() {
                 <div className="mt-6 text-center text-sm">
                   <span className="text-muted-foreground">Don&apos;t have an account? </span>
                   <Link
-                    to="/"
+                    to="/signup"
                     className="text-primary hover:text-primary/80 font-semibold underline-offset-4 hover:underline transition-colors"
                   >
                     Sign up here

@@ -19,6 +19,7 @@ const loadTerms = () => import("@/pages/Terms");
 const loadPrivacy = () => import("@/pages/Privacy");
 const loadTermsPopup = () => import("@/pages/TermsPopup");
 const loadLoginPage = () => import("@/pages/auth/LoginPage");
+const loadSignupPage = () => import("@/pages/Signup");
 const loadRegistrationSuccess = () => import("@/pages/auth/RegistrationSuccess");
 const loadEmailVerification = () => import("@/pages/auth/EmailVerification");
 const loadEmailNotVerified = () => import("@/pages/auth/EmailNotVerified");
@@ -46,6 +47,7 @@ const Terms = lazy(() => loadTerms().then(module => ({ default: module.Terms }))
 const Privacy = lazy(() => loadPrivacy().then(module => ({ default: module.Privacy })));
 const TermsPopup = lazy(() => loadTermsPopup().then(module => ({ default: module.TermsPopup })));
 const LoginPage = lazy(() => loadLoginPage().then(module => ({ default: module.LoginPage })));
+const SignupPage = lazy(() => loadSignupPage());
 const RegistrationSuccess = lazy(() => loadRegistrationSuccess().then(module => ({ default: module.RegistrationSuccess })));
 const EmailVerification = lazy(() => loadEmailVerification().then(module => ({ default: module.EmailVerification })));
 const EmailNotVerified = lazy(() => loadEmailNotVerified().then(module => ({ default: module.EmailNotVerified })));
@@ -55,7 +57,7 @@ const Maintenance = lazy(() => loadMaintenance().then(module => ({ default: modu
 const NavBefore = lazy(() => loadNavBefore());
 const NavAfter = lazy(() => loadNavAfter());
 
-const publicRoutePreloaders = [loadAbout, loadContact, loadDonate, loadSearch, loadLoginPage, loadTerms, loadPrivacy];
+const publicRoutePreloaders = [loadAbout, loadContact, loadDonate, loadSearch, loadLoginPage, loadSignupPage, loadTerms, loadPrivacy];
 const signedInRoutePreloaders = [loadDashboard, loadNotifications, loadSettings, loadPhotos, loadEventDetails, loadUserProfile];
 import { useAuth } from "./context/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -67,7 +69,6 @@ import { InternetStatusBanner } from './components/InternetStatusBanner';
 function App() {
   const { user, profiledata, justLoggedIn } = useAuth();
   const [openLogin, setOpenLogin] = useState(false);
-  const [openSignup, setOpenSignup] = useState(false);
 
   const [theme, _setTheme] = useState("dark");
 
@@ -219,8 +220,6 @@ function App() {
                 <NavBefore
                   openLogin={openLogin}
                   setOpenLogin={setOpenLogin}
-                  openSignup={openSignup}
-                  setOpenSignup={setOpenSignup}
                 />
               }
             </Suspense>
@@ -256,6 +255,7 @@ function App() {
               <Route path="/forgotpassword" element={<ForgotPassword />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/signup" element={<SignupPage />} />
 
               <Route path="/registration-success" element={<RegistrationSuccess />} />
               <Route path="/email-verification" element={<EmailVerification />} />

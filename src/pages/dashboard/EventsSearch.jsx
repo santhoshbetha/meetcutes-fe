@@ -361,6 +361,15 @@ export function EventsSearch({
     }
   }, [searchResults, hasScrolledForSearch]);
 
+  // A fresh search can briefly render an empty result list before the infinite
+  // query data lands. If rows exist, the empty-state dialog must never remain
+  // open over them (it would also block pagination controls).
+  useEffect(() => {
+    if (!isObjEmpty(searchResults)) {
+      setShowNoEventsDialog(false);
+    }
+  }, [searchResults]);
+
   useEffect(() => {
     if (displayedSearchEvents.length === 0) return;
 

@@ -7,15 +7,12 @@ import { Menu, X } from "lucide-react";
 const Login = lazy(() =>
   import("@/pages/auth/Login").then((module) => ({ default: module.Login })),
 );
-const Signup = lazy(() =>
-  import("@/pages/auth/Signup").then((module) => ({ default: module.Signup })),
-);
 
 const AuthDialogFallback = () => (
   <div className="p-6 text-sm text-muted-foreground">Loading...</div>
 );
 
-const NavBefore = ({ openLogin, setOpenLogin, openSignup, setOpenSignup }) => {
+const NavBefore = ({ openLogin, setOpenLogin }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   return (
     <header className="border-b border-border bg-card">
@@ -62,20 +59,13 @@ const NavBefore = ({ openLogin, setOpenLogin, openSignup, setOpenSignup }) => {
             </DialogTrigger>
             {openLogin && (
               <Suspense fallback={<AuthDialogFallback />}>
-                <Login setOpenLogin={setOpenLogin} setOpenSignup={setOpenSignup} />
+                <Login setOpenLogin={setOpenLogin} />
               </Suspense>
             )}
           </Dialog>
-          <Dialog open={openSignup} onOpenChange={setOpenSignup}>
-            <DialogTrigger asChild>
-              <Button>Signup</Button>
-            </DialogTrigger>
-            {openSignup && (
-              <Suspense fallback={<AuthDialogFallback />}>
-                <Signup setOpenSignup={setOpenSignup} setOpenLogin={setOpenLogin} />
-              </Suspense>
-            )}
-          </Dialog>
+          <Button asChild>
+            <Link to="/signup">Signup</Link>
+          </Button>
         </div>
 
         {/* Mobile menu */}
@@ -115,23 +105,14 @@ const NavBefore = ({ openLogin, setOpenLogin, openSignup, setOpenSignup }) => {
                 Login
               </Button>
 
-              <Dialog open={openSignup} onOpenChange={setOpenSignup}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="flex-1"
-                  onClick={() => {
-                    setOpenSignup(true);
-                    setIsMenuOpen(false);
-                  }}
+              <Button asChild size="sm" className="flex-1">
+                <Link
+                  to="/signup"
+                  onClick={() => setIsMenuOpen(false)}
                 >
                   Signup
-                </Button>
-              </DialogTrigger>
-              {openSignup && (
-                <Suspense fallback={<AuthDialogFallback />}>
-                  <Signup setOpenSignup={setOpenSignup} setOpenLogin={setOpenLogin} />
-                </Suspense>
-              )}
-            </Dialog>
+                </Link>
+              </Button>
             </div>
           </div>
         </div>

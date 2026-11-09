@@ -346,16 +346,60 @@ test.describe.serial("signup, onboarding, and dashboard landing", () => {
   });
 
   test("Test Case 1: blocks empty registration, then persists the session", async () => {
-    await page.goto("/");
-    await page.getByRole("button", { name: "Signup", exact: true }).click();
-    await expect(page.getByRole("dialog", { name: "Sign Up for MeetCutes" })).toBeVisible();
-    await expect(page.getByText("Join MeetCutes")).toBeVisible();
+    await page.goto("/signup");
+    await expect(page).toHaveURL(/\/signup$/);
+    await expect(
+      page.getByRole("heading", { name: "Create Your Account" }),
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+      "href",
+      "/login",
+    );
+
+    // The birthday picker must keep its seven-column calendar grid.
+    await page.getByTestId("dob-trigger").click();
+    const calendar = page.locator('[data-slot="calendar"]');
+    await expect(calendar).toBeVisible();
+
+    const calendarLayout = await calendar.evaluate((root) => {
+      const rows = Array.from(root.querySelectorAll("tr.rdp-week"));
+      const firstRowCells = Array.from(
+        rows[0]?.querySelectorAll("td") ?? [],
+      );
+      const firstRowStyle = rows[0] ? getComputedStyle(rows[0]) : null;
+
+      return {
+        rows: rows.length,
+        cellsInFirstRow: firstRowCells.length,
+        rowTops: rows.map((row) =>
+          Math.round(row.getBoundingClientRect().top),
+        ),
+        firstRowXs: firstRowCells.map((cell) =>
+          Math.round(cell.getBoundingClientRect().x),
+        ),
+        display: firstRowStyle?.display ?? null,
+        columns: firstRowStyle?.gridTemplateColumns ?? "",
+      };
+    });
+
+    expect(calendarLayout.rows).toBeGreaterThanOrEqual(4);
+    expect(calendarLayout.cellsInFirstRow).toBe(7);
+    expect(calendarLayout.display).toBe("grid");
+    expect(calendarLayout.columns.split(" ")).toHaveLength(7);
+    expect(new Set(calendarLayout.firstRowXs).size).toBe(7);
+    expect(new Set(calendarLayout.rowTops).size).toBe(calendarLayout.rows);
+
+    await page.getByTestId("dob-trigger").click();
+    await expect(calendar).toHaveCount(0);
 
     // Step A: Formik/Yup must own validation and stop the network call.
     await page.getByRole("button", { name: "Create Account" }).click();
 
     await expect(page.getByText("Email is required")).toBeVisible();
     await expect(page.getByText("Password is required")).toBeVisible();
+    await expect(
+      page.getByText("Please confirm your password"),
+    ).toBeVisible();
     await expect(page.getByText("First name is required")).toBeVisible();
     await expect(page.getByText("Phone number is required")).toBeVisible();
 
@@ -365,6 +409,7 @@ test.describe.serial("signup, onboarding, and dashboard landing", () => {
     // A short password must surface the minimum-length message instead of
     // reaching the network.
     await page.locator("#password").fill("short");
+    await page.locator("#passwordConfirmation").fill("short");
     await page.getByRole("button", { name: "Create Account" }).click();
     await expect(
       page.getByText("Password must be at least 8 characters"),
@@ -377,6 +422,7 @@ test.describe.serial("signup, onboarding, and dashboard landing", () => {
     await page.getByLabel("Phone number").fill(UNIQUE_PHONE);
     await page.getByLabel("Email address").fill(UNIQUE_EMAIL);
     await page.locator("#password").fill(PASSWORD);
+    await page.locator("#passwordConfirmation").fill(PASSWORD);
 
     await page.getByText("Select your gender", { exact: true }).click();
     await page.getByRole("option", { name: "Male", exact: true }).click();
@@ -591,4 +637,14 @@ test.describe.serial("signup, onboarding, and dashboard landing", () => {
     await expect(page.locator("#root")).not.toBeEmpty();
     expect(pageErrors).toEqual([]);
   });
+});
+
+test("navbar Signup link opens the standalone signup route", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "Signup", exact: true }).first().click();
+
+  await expect(page).toHaveURL(/\/signup$/);
+  await expect(
+    page.getByRole("heading", { name: "Create Your Account" }),
+  ).toBeVisible();
 });

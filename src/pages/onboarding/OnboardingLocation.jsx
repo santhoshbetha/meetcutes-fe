@@ -31,9 +31,11 @@ export function OnboardingLocation() {
   const [selectedLocation, setSelectedLocation] = useState(null);
 
   useEffect(() => {
-    // The onboarding route now owns the flow, so Home may resume its normal
-    // signed-in redirect behavior.
-    useAuthStore.getState().setOnboardingInProgress(false);
+    // Keep Home's signed-in redirect suppressed for the whole handoff. The
+    // flag clears when onboarding unmounts (Next Step, Skip, or navigation).
+    return () => {
+      useAuthStore.getState().setOnboardingInProgress(false);
+    };
   }, []);
 
   useEffect(() => {
