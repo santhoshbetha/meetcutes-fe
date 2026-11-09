@@ -1,5 +1,12 @@
 import { test, expect } from "@playwright/test";
-import { apiLogin, API_URL, authHeaders, login, USERS } from "./helpers.js";
+import {
+  apiLogin,
+  API_URL,
+  authHeaders,
+  login,
+  USERS,
+  userIdByHandle,
+} from "./helpers.js";
 
 /**
  * Notification inbox coverage.
@@ -298,5 +305,63 @@ test.describe("notification inbox", () => {
       updated: 2,
       unread_count: 0,
     });
+  });
+
+  test("receives a persisted like notification over the real personal channel", async ({
+    page,
+    request,
+  }) => {
+    const viewerToken = await apiLogin(request, USERS.viewer.email);
+    const likerToken = await apiLogin(request, USERS.blockTarget.email);
+    const viewerId = await userIdByHandle(
+      request,
+      viewerToken,
+      USERS.viewer.handle,
+    );
+    const likerId = await userIdByHandle(
+      request,
+      likerToken,
+      USERS.blockTarget.handle,
+    );
+
+    await login(page, USERS.viewer.email);
+    await page.goto("/notifications");
+
+    await expect(
+      page.getByRole("heading", { name: "Notifications", exact: true }),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("Welcome to your new inbox")).toBeVisible();
+
+    // Wait until the shared Phoenix socket and personal channel are live before
+    // triggering the like, otherwise the push can race the join handshake.
+    await page.waitForFunction(
+      async () => {
+        const { isSocketConnected } = await import("/src/lib/socket.js");
+        return isSocketConnected();
+      },
+      null,
+      { timeout: 20_000 },
+    );
+    await page.waitForTimeout(500);
+
+    const likeResponse = await request.post(
+      `${API_URL}/api/v1/relationships`,
+      {
+        headers: authHeaders(likerToken),
+        data: { kind: "like", target_id: viewerId },
+      },
+    );
+
+    expect(likeResponse.status(), await likeResponse.text()).toBe(201);
+
+    // The notification card links to the liker's profile, proving the persisted
+    // row arrived over the live socket and survived the inbox refetch.
+    await expect(
+      page.locator(`a[href="/user/${likerId}"]`),
+    ).toBeVisible({ timeout: 20_000 });
+
+    const bellBadge = page.locator('header a[href="/notifications"] span');
+    await expect(bellBadge).toBeVisible({ timeout: 20_000 });
+    await expect(bellBadge).toHaveText(/^[1-9]\d*$/);
   });
 });

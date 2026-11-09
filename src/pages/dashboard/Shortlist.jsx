@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   ArrowRight,
+  ChevronDown,
   Heart,
   HeartHandshake,
   HeartOff,
@@ -22,6 +23,7 @@ import {
 import {
   useLikedUsers,
   useLikesReceived,
+  useRelationshipsQuery,
   useRelationshipMutation,
 } from "@/hooks/useProfileQueries";
 import { resolveUserImage } from "@/lib/userImage";
@@ -32,6 +34,10 @@ const MAX_DISTANCE_MILES = 100;
 function withinRadius(user) {
   const distance = Number(user?.distance_miles);
   return !Number.isFinite(distance) || distance <= MAX_DISTANCE_MILES;
+}
+
+function flattenQueryPages(data) {
+  return (data?.pages ?? []).flatMap((page) => page.users ?? []);
 }
 
 function displayName(user) {
@@ -140,8 +146,8 @@ function ShortlistCard({
 
           <Button
             type="button"
-            size="sm"
-            variant={isShortlist ? "outline" : matched ? "secondary" : "default"}
+            size={isShortlist ? "sm" : "default"}
+            variant={isShortlist ? "outline" : "secondary"}
             onClick={() => onAction(user)}
             disabled={isPending || matched}
             aria-label={
@@ -151,7 +157,11 @@ function ShortlistCard({
                   ? `Matched with ${name}`
                   : `Like back ${name}`
             }
-            className={isShortlist ? "border-border/60" : ""}
+            className={
+              isShortlist
+                ? "border-border/60"
+                : "bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold px-4 py-2 rounded-xl transition-colors duration-200 disabled:opacity-60"
+            }
           >
             {isPending ? (
               <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
@@ -172,7 +182,7 @@ function ShortlistCard({
   );
 }
 
-function PanelState({ query, emptyTitle, emptyDescription }) {
+function PanelState({ query, users, emptyTitle, emptyDescription }) {
   if (query.isLoading) {
     return (
       <Card className="border border-border/60 bg-card/40 backdrop-blur-lg">
@@ -194,7 +204,7 @@ function PanelState({ query, emptyTitle, emptyDescription }) {
     );
   }
 
-  if (!query.data?.length) {
+  if (!users.length) {
     return (
       <Card className="border border-dashed border-border/70 bg-muted/20">
         <CardContent className="p-12 text-center">
@@ -233,20 +243,29 @@ export function Shortlist() {
 
   const likedQuery = useLikedUsers();
   const receivedQuery = useLikesReceived();
+  const relationshipsQuery = useRelationshipsQuery();
   const mutation = useRelationshipMutation();
 
   const likedUsers = useMemo(
-    () => (likedQuery.data ?? []).filter(withinRadius),
+    () => flattenQueryPages(likedQuery.data).filter(withinRadius),
     [likedQuery.data],
   );
   const receivedUsers = useMemo(
-    () => (receivedQuery.data ?? []).filter(withinRadius),
+    () => flattenQueryPages(receivedQuery.data).filter(withinRadius),
     [receivedQuery.data],
   );
 
-  const likedIds = useMemo(
-    () => new Set(likedUsers.map((user) => userKey(user))),
-    [likedUsers],
+  const likedTotal =
+    likedQuery.data?.pages?.[0]?.pagination?.total ?? likedUsers.length;
+  const receivedTotal =
+    receivedQuery.data?.pages?.[0]?.pagination?.total ?? receivedUsers.length;
+
+  const matchedIds = useMemo(
+    () =>
+      new Set(
+        (relationshipsQuery.data?.matches ?? []).map((id) => String(id)),
+      ),
+    [relationshipsQuery.data],
   );
 
   const pendingLike =
@@ -312,14 +331,14 @@ export function Shortlist() {
               className="border-fuchsia-500/20 bg-fuchsia-500/10 px-3 py-1 text-xs text-fuchsia-600 dark:text-fuchsia-300"
             >
               <Heart className="mr-1.5 h-3.5 w-3.5" />
-              {likedUsers.length} liked
+              {likedTotal} liked
             </Badge>
             <Badge
               variant="secondary"
               className="border-primary/20 bg-primary/10 px-3 py-1 text-xs text-primary"
             >
               <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-              {receivedUsers.length} interested
+              {receivedTotal} interested
             </Badge>
           </div>
         </div>
@@ -337,7 +356,7 @@ export function Shortlist() {
           >
             My Shortlist
             <Badge variant="secondary" className="ml-2 font-mono text-[10px] text-primary">
-              {likedUsers.length}
+              {likedTotal}
             </Badge>
           </TabsTrigger>
           <TabsTrigger
@@ -346,7 +365,7 @@ export function Shortlist() {
           >
             Liked You
             <Badge variant="secondary" className="ml-2 font-mono text-[10px] text-primary">
-              {receivedUsers.length}
+              {receivedTotal}
             </Badge>
           </TabsTrigger>
         </TabsList>
@@ -360,21 +379,50 @@ export function Shortlist() {
           </div>
 
           {likedUsers.length > 0 ? (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {likedUsers.map((user) => (
-                <ShortlistCard
-                  key={userKey(user)}
-                  user={user}
-                  variant="shortlist"
-                  shortlistTab={activeTab}
-                  isPending={isPendingFor(user, "delete")}
-                  onAction={handleUnlike}
-                />
-              ))}
-            </div>
+            <>
+              <div
+                data-testid="shortlist-grid"
+                className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
+              >
+                {likedUsers.map((user) => (
+                  <ShortlistCard
+                    key={userKey(user)}
+                    user={user}
+                    variant="shortlist"
+                    shortlistTab={activeTab}
+                    isPending={isPendingFor(user, "delete")}
+                    onAction={handleUnlike}
+                  />
+                ))}
+              </div>
+
+              {likedQuery.hasNextPage && (
+                <div className="flex justify-center pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="rounded-xl border-border/50 bg-card/40 text-muted-foreground hover:text-foreground"
+                    onClick={() => likedQuery.fetchNextPage()}
+                    disabled={likedQuery.isFetchingNextPage}
+                    data-testid="shortlist-load-more"
+                  >
+                    {likedQuery.isFetchingNextPage ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <ChevronDown className="mr-2 h-4 w-4" />
+                    )}
+                    {likedQuery.isFetchingNextPage
+                      ? "Loading saved profiles..."
+                      : "View More Saved Profiles"}
+                  </Button>
+                </div>
+              )}
+            </>
           ) : (
             <PanelState
               query={likedQuery}
+              users={likedUsers}
               emptyTitle="Your shortlist is empty"
               emptyDescription="Like nearby profiles from search and they will appear here."
             />
@@ -385,31 +433,60 @@ export function Shortlist() {
           <div>
             <h2 className="text-lg font-bold text-foreground">People who liked you</h2>
             <p className="text-sm text-muted-foreground">
-              Like them back to turn an interested connection into a match.
+              Nearby members who have already liked your profile.
             </p>
           </div>
 
           {receivedUsers.length > 0 ? (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {receivedUsers.map((user) => {
-                const matched = likedIds.has(userKey(user));
+            <>
+              <div
+                data-testid="liked-you-grid"
+                className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
+              >
+                {receivedUsers.map((user) => {
+                  const matched = matchedIds.has(userKey(user));
 
-                return (
-                  <ShortlistCard
-                    key={userKey(user)}
-                    user={user}
-                    variant="liked-you"
-                    matched={matched}
-                    shortlistTab={activeTab}
-                    isPending={isPendingFor(user, "create")}
-                    onAction={handleLikeBack}
-                  />
-                );
-              })}
-            </div>
+                  return (
+                    <ShortlistCard
+                      key={userKey(user)}
+                      user={user}
+                      variant="liked-you"
+                      matched={matched}
+                      shortlistTab={activeTab}
+                      isPending={isPendingFor(user, "create")}
+                      onAction={handleLikeBack}
+                    />
+                  );
+                })}
+              </div>
+
+              {receivedQuery.hasNextPage && (
+                <div className="flex justify-center pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="rounded-xl border-border/50 bg-card/40 text-muted-foreground hover:text-foreground"
+                    onClick={() => receivedQuery.fetchNextPage()}
+                    disabled={receivedQuery.isFetchingNextPage}
+                    data-testid="liked-you-load-more"
+                  >
+                    {receivedQuery.isFetchingNextPage ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <ChevronDown className="mr-2 h-4 w-4" />
+                    )}
+                    {receivedQuery.isFetchingNextPage
+                      ? "Loading more likes..."
+                      : "Load More Likes"}
+                  </Button>
+                </div>
+              )}
+            </>
           ) : (
             <PanelState
               query={receivedQuery}
+              users={receivedUsers}
               emptyTitle="No new likes yet"
               emptyDescription="When nearby members like your profile, they will show up here."
             />

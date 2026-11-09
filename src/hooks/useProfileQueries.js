@@ -1,5 +1,10 @@
 import { useEffect } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { authKeys } from "@/hooks/useAuthQueries";
 import { toAuthUser } from "@/services/auth.service";
 import {
@@ -11,8 +16,8 @@ import {
   fetchProfileById,
   fetchRelationships,
   fetchRelationshipUsers,
-  fetchLikedUsers,
-  fetchLikesReceived,
+  fetchLikedUsersPage,
+  fetchLikesReceivedPage,
   setHandle,
   updateMyProfile,
 } from "@/services/profile.service";
@@ -211,13 +216,20 @@ export function useRelationshipDirectoryQuery(kind) {
 
 /**
  * People the signed-in user has liked within the backend's 100-mile radius.
+ * Pages are capped at 20 profiles so the shortlist never renders an unbounded
+ * history in one pass.
  */
 export function useLikedUsers() {
   const token = useAuthStore((state) => state.token);
 
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: profileKeys.liked(token),
-    queryFn: fetchLikedUsers,
+    queryFn: ({ pageParam = 1 }) => fetchLikedUsersPage(pageParam, 20),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage.pagination.hasNextPage
+        ? lastPage.pagination.page + 1
+        : undefined,
     enabled: Boolean(token),
     staleTime: 30 * 1000,
     retry: (failureCount, error) => error?.status !== 401 && failureCount < 1,
@@ -230,9 +242,14 @@ export function useLikedUsers() {
 export function useLikesReceived() {
   const token = useAuthStore((state) => state.token);
 
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: profileKeys.likesReceived(token),
-    queryFn: fetchLikesReceived,
+    queryFn: ({ pageParam = 1 }) => fetchLikesReceivedPage(pageParam, 20),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage.pagination.hasNextPage
+        ? lastPage.pagination.page + 1
+        : undefined,
     enabled: Boolean(token),
     staleTime: 30 * 1000,
     retry: (failureCount, error) => error?.status !== 401 && failureCount < 1,
@@ -312,17 +329,21 @@ export function useRelationshipMutation() {
       }
 
       if (variables.kind === "like" && variables.action === "delete") {
-        queryClient.setQueryData(
-          profileKeys.liked(token),
-          (current) =>
-            Array.isArray(current)
-              ? current.filter(
-                  (user) =>
-                    String(user?.userid ?? user?.id) !==
-                    String(variables.targetId),
-                )
-              : current,
-        );
+        queryClient.setQueryData(profileKeys.liked(token), (current) => {
+          if (!current?.pages) return current;
+
+          return {
+            ...current,
+            pages: current.pages.map((page) => ({
+              ...page,
+              users: (page.users ?? []).filter(
+                (user) =>
+                  String(user?.userid ?? user?.id) !==
+                  String(variables.targetId),
+              ),
+            })),
+          };
+        });
       }
 
       // Covers the summary, directories, shortlist and likes-received lists.

@@ -130,6 +130,32 @@ async function mockShortlistApi(
       body: JSON.stringify(body),
     });
 
+  const paginate = (users, kind, route) => {
+    const url = new URL(route.request().url());
+    const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
+    const perPage = Math.max(
+      1,
+      Math.min(20, Number(url.searchParams.get("per_page")) || 20),
+    );
+    const total = users.length;
+    const totalPages = Math.ceil(total / perPage);
+    const pageUsers = users.slice((page - 1) * perPage, page * perPage);
+
+    return respond(route, {
+      data: {
+        kind,
+        users: pageUsers,
+        pagination: {
+          page,
+          per_page: perPage,
+          total,
+          total_pages: totalPages,
+          has_next_page: page < totalPages,
+        },
+      },
+    });
+  };
+
   await page.route("**/api/users/profile", async (route) => {
     await respond(route, { status: "success", user: PROFILE });
   });
@@ -174,21 +200,26 @@ async function mockShortlistApi(
     const request = route.request();
     const method = request.method();
     const pathname = new URL(request.url()).pathname;
+    const matches = liked
+      .filter((user) =>
+        received.some((fan) => String(fan.id) === String(user.id)),
+      )
+      .map((user) => user.id);
     const summary = {
       likes: liked.map((user) => user.id),
       blocks: [],
       mutes: [],
-      matches: [],
+      matches,
     };
 
     if (method === "GET" && pathname.endsWith("/liked")) {
       ledger.likedRequests += 1;
-      return respond(route, { data: { kind: "liked", users: liked } });
+      return paginate(liked, "liked", route);
     }
 
     if (method === "GET" && pathname.endsWith("/liked-by")) {
       ledger.receivedRequests += 1;
-      return respond(route, { data: { kind: "liked_by", users: received } });
+      return paginate(received, "liked_by", route);
     }
 
     if (method === "GET" && pathname.endsWith("/blocked")) {
@@ -374,5 +405,65 @@ test.describe("shortlist discovery", () => {
     await expect(
       page.getByRole("tab", { name: /Liked You/ }),
     ).toHaveAttribute("data-state", "active");
+  });
+
+  test("loads shortlist and liked-you pages in twenty-card chunks", async ({
+    page,
+  }) => {
+    const likedUsers = Array.from({ length: 21 }, (_, index) =>
+      profileFor({
+        id: `liked-page-${index + 1}`,
+        first_name: `Saved${index + 1}`,
+        last_name: "Member",
+        nickname: `saved_${index + 1}`,
+        distance_miles: index + 1,
+      }),
+    );
+    const receivedUsers = Array.from({ length: 21 }, (_, index) =>
+      profileFor({
+        id: `received-page-${index + 1}`,
+        first_name: `Admirer${index + 1}`,
+        last_name: "Member",
+        nickname: `admirer_${index + 1}`,
+        distance_miles: index + 1,
+      }),
+    );
+
+    const ledger = await mockShortlistApi(page, { likedUsers, receivedUsers });
+
+    await seedSession(page, "/dashboard/shortlist");
+
+    const shortlistGrid = page.getByTestId("shortlist-grid");
+    await expect(shortlistGrid).toBeVisible({ timeout: 20_000 });
+    await expect(shortlistGrid.locator('[data-slot="card"]')).toHaveCount(20);
+    await expect(page.getByText("Saved21", { exact: false })).toHaveCount(0);
+
+    const shortlistMore = page.getByTestId("shortlist-load-more");
+    await expect(shortlistMore).toBeVisible();
+    await expect(shortlistMore).toContainText("View More Saved Profiles");
+    await shortlistMore.click();
+
+    await expect(page.getByText("Saved21", { exact: false })).toBeVisible();
+    await expect(shortlistGrid.locator('[data-slot="card"]')).toHaveCount(21);
+    await expect(shortlistMore).toHaveCount(0);
+
+    await page.getByRole("tab", { name: /Liked You/ }).click();
+
+    const likedYouGrid = page.getByTestId("liked-you-grid");
+    await expect(likedYouGrid).toBeVisible();
+    await expect(likedYouGrid.locator('[data-slot="card"]')).toHaveCount(20);
+    await expect(page.getByText("Admirer21", { exact: false })).toHaveCount(0);
+
+    const likedYouMore = page.getByTestId("liked-you-load-more");
+    await expect(likedYouMore).toBeVisible();
+    await expect(likedYouMore).toContainText("Load More Likes");
+    await likedYouMore.click();
+
+    await expect(page.getByText("Admirer21", { exact: false })).toBeVisible();
+    await expect(likedYouGrid.locator('[data-slot="card"]')).toHaveCount(21);
+    await expect(likedYouMore).toHaveCount(0);
+
+    expect(ledger.likedRequests).toBeGreaterThanOrEqual(2);
+    expect(ledger.receivedRequests).toBeGreaterThanOrEqual(2);
   });
 });

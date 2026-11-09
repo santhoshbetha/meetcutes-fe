@@ -98,21 +98,22 @@ export function useNotificationChannel({ token, userId, enabled = true } = {}) {
     const handleNewNotification = (payload) => {
       const notification = normalizeNotification(payload);
 
-      if (!notification) {
-        queryClient.invalidateQueries({ queryKey: notificationKeys.all });
-        return;
-      }
-
-      queryClient.setQueriesData(
-        { queryKey: [NOTIFICATIONS_QUERY_ROOT, "list"] },
-        (oldData) => prependNotificationToCache(oldData, notification),
-      );
-
-      if (!notification.is_read) {
-        queryClient.setQueryData(notificationKeys.unreadCount(), (current) =>
-          typeof current === "number" ? current + 1 : current,
+      if (notification) {
+        queryClient.setQueriesData(
+          { queryKey: [NOTIFICATIONS_QUERY_ROOT, "list"] },
+          (oldData) => prependNotificationToCache(oldData, notification),
         );
+
+        if (!notification.is_read) {
+          queryClient.setQueryData(notificationKeys.unreadCount(), (current) =>
+            typeof current === "number" ? current + 1 : current,
+          );
+        }
       }
+
+      // Always reconcile the optimistic patch with the persisted row so the
+      // inbox list and unread badge stay correct after every live push.
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     };
 
     const handleLegacyNotification = () => {

@@ -126,12 +126,6 @@ export function Dashboard({ userProfileMode = false }) {
 
   const navigationItems = [
     {
-      id: "profile",
-      label: "My Profile",
-      icon: User,
-      description: "Manage your profile information"
-    },
-    {
       id: "users",
       label: "Search Users",
       icon: Users,
@@ -144,6 +138,12 @@ export function Dashboard({ userProfileMode = false }) {
       description: "Find and discover events"
     },
     {
+      id: "events",
+      label: "My Events",
+      icon: CalendarSearch,
+      description: "Manage your created events"
+    },
+    {
       id: "shortlist",
       label: "My Shortlist",
       icon: Heart,
@@ -151,10 +151,10 @@ export function Dashboard({ userProfileMode = false }) {
       path: "/dashboard/shortlist"
     },
     {
-      id: "events",
-      label: "My Events",
-      icon: CalendarSearch,
-      description: "Manage your created events"
+      id: "profile",
+      label: "My Profile",
+      icon: User,
+      description: "Manage your profile information"
     },
     {
       id: "photos",

@@ -129,6 +129,47 @@ export async function fetchRelationshipUsers(kind) {
   return (Array.isArray(users) ? users : []).map(mapProfileToLegacy);
 }
 
+function toCount(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+/**
+ * Loads one bounded page of the shortlist or liked-you directory.
+ *
+ * The backend caps pages at 20 profiles, so infinite queries never request an
+ * unbounded interaction history.
+ */
+export async function fetchShortlistUsers(
+  kind,
+  { page = 1, perPage = 20 } = {},
+) {
+  const payload = await api.get(
+    `/api/v1/relationships/${encodeURIComponent(kind)}?page=${encodeURIComponent(page)}&per_page=${encodeURIComponent(perPage)}`,
+  );
+
+  const data = payload?.data ?? payload ?? {};
+  const users = Array.isArray(data.users) ? data.users : [];
+  const pagination = data.pagination ?? {};
+
+  return {
+    users: users.map(mapProfileToLegacy),
+    pagination: {
+      page: toCount(pagination.page, page),
+      perPage: toCount(pagination.per_page, perPage),
+      total: toCount(pagination.total, users.length),
+      totalPages: toCount(pagination.total_pages, 1),
+      hasNextPage: Boolean(pagination.has_next_page),
+    },
+  };
+}
+
+export const fetchLikedUsersPage = (page, perPage = 20) =>
+  fetchShortlistUsers("liked", { page, perPage });
+
+export const fetchLikesReceivedPage = (page, perPage = 20) =>
+  fetchShortlistUsers("liked-by", { page, perPage });
+
 export const fetchBlockedUsers = () => fetchRelationshipUsers("blocked");
 export const fetchMutedUsers = () => fetchRelationshipUsers("muted");
 export const fetchLikedUsers = () => fetchRelationshipUsers("liked");
