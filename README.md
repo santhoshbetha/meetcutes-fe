@@ -1,164 +1,152 @@
-# React + Vite
+# MeetCutes Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React/Vite client for MeetCutes, a real-world social discovery platform built around local events, proximity search, and authenticated profiles.
 
-Currently, two official plugins are available:
+## Production stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+| Layer | Technology |
+| --- | --- |
+| UI | React 19, Vite 7, Tailwind CSS 4, shadcn/ui + Radix primitives |
+| Icons | Lucide React + React Icons |
+| Client state | Zustand |
+| Server state | TanStack Query |
+| Forms | Formik + Yup |
+| Maps | Leaflet (loaded by the location workspace) |
+| Realtime | Phoenix Channels JavaScript client |
+| E2E | Playwright |
+| Hosting | Cloudflare Pages/Workers via Wrangler |
 
-## React Compiler
+Authentication, profiles, locations, events, discovery, discussions, notifications, billing, and media all run against the Meetcutes Elixir/Phoenix JSON API. The client uses an opaque bearer token and does not contain a hosted-BaaS SDK or Edge Function project.
 
-The React Compiler is currently not compatible with SWC. See [this issue](https://github.com/vitejs/vite-plugin-react/issues/428) for tracking the progress.
+## Requirements
 
-## Maintenance Mode
+- Node.js 20 or newer (Node 22 is used in the production Docker image).
+- npm 10 or newer.
+- A running Meetcutes Phoenix API, locally or remotely.
+- A Geoapify browser key for location autocomplete.
 
-The application includes a built-in maintenance mode feature that can be enabled by setting the `VITE_MAINTENANCE_MODE` environment variable.
+## Local development
 
-### How to Enable Maintenance Mode
+```bash
+npm install
+cp .env.example .env
+```
 
-1. Open the `.env` file in the project root
-2. Set the maintenance mode variable:
-   ```env
-   VITE_MAINTENANCE_MODE=true
-   ```
-3. Restart the development server or rebuild the application
+Set the API endpoints in `.env`:
 
-### Accepted Values
+```env
+VITE_API_URL=http://localhost:4000
+VITE_WS_URL=ws://localhost:4000/socket
+VITE_SITE_URL=http://localhost:5173
+VITE_REACT_APP_GEOAPIFY_API_KEY=your_geoapify_key
+```
 
-The following values will enable maintenance mode:
-- `true`
-- `1`
-- `yes`
+Start the Vite dev server:
 
-Any other value (or unset) will keep the application in normal mode.
+```bash
+npm run dev
+```
 
-### Features
+The app is served at <http://localhost:5173> by default.
 
-When maintenance mode is enabled:
-- All users see a professional maintenance page instead of the application
-- The page includes a countdown timer that auto-refreshes every 5 minutes
-- Users can manually check status with a refresh button
-- Contact information is provided for urgent inquiries
-- The page maintains the app's design theme and branding
+## Environment variables
 
-### Disabling Maintenance Mode
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `VITE_API_URL` | Yes | Phoenix JSON API base URL. Production builds must set this explicitly. |
+| `VITE_WS_URL` | No | Phoenix socket URL. Defaults to the API origin with `/socket`. |
+| `VITE_SITE_URL` | Recommended | Public frontend URL used for canonical links and redirects. |
+| `VITE_REACT_APP_GEOAPIFY_API_KEY` | Yes for address search | Geoapify browser key for autocomplete. |
+| `VITE_MAINTENANCE_MODE` | No | `true`, `1`, or `yes` renders the maintenance screen. |
+| `VITE_ASSET_HOST` | No | CDN/R2 asset host for raw user images. |
+| `VITE_CDN_URL` | No | Fallback CDN host for user images. |
 
-To return to normal operation:
-1. Set `VITE_MAINTENANCE_MODE=false` or remove/comment out the variable
-2. Restart the development server or rebuild the application
+Vite inlines these values at build time. Rebuild and redeploy whenever a value changes.
 
-## Authentication
+## Application structure
 
-Authentication runs against the Elixir/Phoenix JSON API using an opaque bearer
-token stored with `react-secure-storage`.
+```text
+src/
+  components/       Reusable UI, event, location, and media components
+  context/          Thin compatibility providers for loading/auth consumers
+  hooks/            TanStack Query hooks, channels, presence, notifications
+  lib/              API client, socket client, geospatial helpers, utilities
+  pages/            Route screens (signup, onboarding, dashboard, settings)
+  services/         HTTP/service adapters for the Phoenix API
+  stores/           Zustand stores for session, autocomplete, search, presence
+e2e/                Playwright specs, helpers, and global setup
+public/             Static assets and the service worker
+```
 
-- `src/stores/authStore.js` (Zustand) owns client/session state: the bearer
-  token, the minimal `{ id, email }` auth user, and the legacy `profiledata`
-  shape. The token and cached user are persisted under `meetcutes.auth.token`
-  and `meetcutes.auth.user`.
-- `src/services/auth.service.js` performs the HTTP calls and maps the backend's
-  canonical snake_case profile into the legacy key names the app still uses.
-- `src/hooks/useAuthQueries.js` (TanStack Query) loads the profile whenever a
-  token is present and exposes login, register, logout, confirm, resend, and
-  password-reset mutations.
-- `src/context/AuthContext.jsx` is a thin compatibility layer that preserves the
-  existing `useAuth()` consumer API.
+### Auth and data flow
 
-Signup sends a confirmation email and does not issue a session. The user
-confirms via `/email-verification?token=...`, then logs in. Password resets
-arrive at `/changepassword?token=...`.
+- `src/stores/authStore.js` owns the bearer token, cached auth user, and legacy profile shape.
+- `src/lib/api.js` attaches `Authorization: Bearer <token>` to authenticated requests.
+- `src/hooks/useAuthQueries.js` loads the signed-in profile and exposes login, register, logout, confirmation, and password-reset mutations.
+- `src/services/*.service.*` map the backend's canonical snake_case payloads to the shapes consumed by the existing UI.
+- `src/context/AuthContext.jsx` is a compatibility adapter that preserves the existing `useAuth()` consumer API over Zustand and TanStack Query.
 
-### Realtime (Phoenix Channels)
+### Realtime
 
-There is no legacy realtime dependency. Live event attendee updates use the
-native `phoenix` JavaScript client against the Elixir socket at `/socket`:
+`src/lib/socket.js` owns one shared Phoenix socket, authenticated with the current bearer token. Event and notification hooks join the relevant topics and invalidate or patch TanStack Query caches when broadcasts arrive.
 
-- `src/lib/socket.js` owns one shared `Socket`, authenticated with the current
-  bearer token (`params: { token }`). It reconnects with Phoenix's built-in
-  backoff and disconnects when the token is cleared.
-- `src/hooks/useEventChannel.js` joins `event:<id>` and invalidates the event
-  query when the backend broadcasts `attendees_updated` (also accepts the
-  legacy `user_joined`/`user_left` events).
-- `src/pages/EventDetails.jsx` calls the hook, so attendee counts refresh
-  without waiting for the list's polling interval.
+### Maps
 
-The socket URL defaults to the API origin (`http://…` → `ws://…`, `https://…`
-→ `wss://…`) and can be overridden with `VITE_WS_URL`.
+The location workspace loads Leaflet from unpkg and stores fuzzed coordinates through the profile API. Raw coordinates are never used for public display.
 
-### Backend status
+## Testing
 
-The app has no hosted-BaaS SDK, no Edge Functions project, and no legacy
-hosted-BaaS environment variables. Authentication, profiles, photos, locations,
-events, search, discussions, and email/password flows all run against the
-Elixir/Phoenix JSON API.
+Playwright starts the Phoenix API on port `4100` and the Vite app on port `5180` through `playwright.config.js`. The global setup seeds the backend with deterministic E2E accounts.
 
-## Cloudflare Deployment With Wrangler
+```bash
+npx playwright test
+# or
+npm run test:e2e
+```
 
-This app can be deployed to Cloudflare as a static-assets Worker using Wrangler. The app uses `BrowserRouter`, so the Wrangler config includes SPA fallback handling for deep links such as `/notifications` or `/user/:userid`.
+Useful variants:
 
-### 1. Prepare environment variables
+```bash
+npx playwright test e2e/user-signup-flow.spec.js
+npx playwright test --ui
+npx playwright show-report
+```
 
-Create or update your local `.env` file using `.env.example` as the template.
+## Cloudflare deployment with Wrangler
 
-Required variables:
-
-- `VITE_API_URL` — base URL of the Elixir/Phoenix JSON API, for example `http://localhost:4000`. When unset the app falls back to `http://localhost:4000`.
-- `VITE_SITE_URL`
-- `VITE_REACT_APP_GEOAPIFY_API_KEY`
-
-Optional variables:
-
-- `VITE_WS_URL` — Phoenix socket endpoint. Defaults to the API origin with
-  `/socket` appended (`http` → `ws`, `https` → `wss`).
-- `VITE_MAINTENANCE_MODE` — see the maintenance-mode section above.
-
-Recommended for Cloudflare:
-
-- Set `VITE_SITE_URL` to your final Cloudflare URL, for example `https://meetcutes.your-subdomain.workers.dev`
-
-### 2. Authenticate Wrangler
+`wrangler.toml` publishes the Vite `dist/` output as static assets with SPA fallback for React Router deep links.
 
 ```bash
 npm run cf:whoami
-```
-
-If you are not logged in yet, run:
-
-```bash
-npx wrangler login
-```
-
-### 3. Preview locally with Cloudflare
-
-```bash
 npm run cf:preview
-```
-
-This builds the Vite app and serves it through Wrangler using the config in `wrangler.toml`.
-
-### 4. Deploy
-
-```bash
 npm run cf:deploy
 ```
 
-That command:
+Commands:
 
-- builds the app into `dist`
-- deploys the built assets with `wrangler deploy`
-- enables SPA fallback so client-side routes work after refresh
+- `npm run cf:build` — builds the Vite app.
+- `npm run cf:preview` — builds and serves locally through Wrangler.
+- `npm run cf:deploy` — builds and deploys to Cloudflare.
+- `npm run cf:whoami` — shows the authenticated Wrangler account.
 
-### 5. Optional custom domain
+Before deploying, provide the `VITE_*` values through the build environment. The production API URL must be reachable from the browser and must allow the Cloudflare origin through `CORS_ORIGINS`.
 
-After the first deployment, you can attach a custom domain from the Cloudflare dashboard or extend `wrangler.toml` with routes for a zone you control.
+### Custom domains
 
-### Notes
+Attach `meetcutes.us` and any `www`/app subdomain through the Cloudflare dashboard or a Wrangler route. Rebuild after changing `VITE_SITE_URL` so auth and email redirects use the final domain.
 
-- `public/sw.js` is deployed as a static asset and will continue to work in production.
-- Because this app is built by Vite, all `VITE_*` values must exist before running the build command.
-- If you change `VITE_SITE_URL`, rebuild and redeploy so auth redirect URLs stay correct.
+## Maintenance mode
 
-## Expanding the ESLint configuration
+Set `VITE_MAINTENANCE_MODE=true` and rebuild to show the maintenance page. The backend profile flag `maintenance_mode_active` can also force the maintenance screen at runtime without a frontend rebuild.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Docker image
+
+The included multi-stage `Dockerfile` builds the Vite bundle and serves it with nginx, including SPA fallback and `/health`. Build arguments must include `VITE_API_URL`; the image fails the build if it is missing.
+
+```bash
+docker build \
+  --build-arg VITE_API_URL=https://api.meetcutes.us \
+  --build-arg VITE_WS_URL=wss://api.meetcutes.us/socket \
+  --build-arg VITE_SITE_URL=https://meetcutes.us \
+  -t meetcutes-frontend .
+```

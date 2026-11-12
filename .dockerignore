@@ -1,17 +1,32 @@
+# Version control and local metadata
+.git
+.gitignore
+.vscode
+.idea
+
+# Dependencies and build output are rebuilt inside the image.
 node_modules
 dist
 dist-ssr
-.git
-.vscode
 .wrangler
-test-results
+
+# Test artifacts and test sources are not part of the production image.
 playwright-report
+test-results
 blob-report
 playwright
 e2e
 playwright.config.js
-npm-debug.log*
-*.local
+
+# Local helper scripts and documentation.
+scripts
+README.md
+
+# Never send local credentials or environment files into the build context.
 .env
 .env.*
 !.env.example
+
+# Logs and local-only files.
+npm-debug.log*
+*.local

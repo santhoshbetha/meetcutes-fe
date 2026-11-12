@@ -63,4 +63,4 @@ const LoadingButton = React.forwardRef(
 );
 LoadingButton.displayName = "LoadingButton";
 
-export { LoadingButton, buttonVariants };
+export { LoadingButton };

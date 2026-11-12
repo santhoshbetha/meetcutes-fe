@@ -34,7 +34,6 @@ export function ChangeLocation({ onClose }) {
   const [city, setCity] = useState("")
   const isOnline = useOnlineStatus();
   const [allowlocationchange, setAllowlocationchange] = useState(false);
-  const datenow = new Date(Date.now());
   const currentState = profiledata?.state;
   const currentCity = profiledata?.city;
 
@@ -55,6 +54,7 @@ export function ChangeLocation({ onClose }) {
   };
 
   useEffect(() => {
+    const datenow = new Date(Date.now());
     if (!isObjEmpty(profiledata)) {
         if (!isObjEmpty(profiledata?.dateoflocation)) {
             let dif = Math.abs(datenow - new Date(profiledata?.dateoflocation))
@@ -69,7 +69,7 @@ export function ChangeLocation({ onClose }) {
           setAllowlocationchange(true)
         }
     }
-  }, [profiledata, datenow]);
+  }, [profiledata]);
 
   const handleLocationSubmit = async (e) => {
       e.preventDefault()

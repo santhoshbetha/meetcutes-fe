@@ -8,7 +8,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/', 
+  base: '/',
   plugins: [react(), tailwindcss()],
   build: {
     rollupOptions: {
@@ -24,8 +24,7 @@ export default defineConfig({
           storage: ['react-secure-storage'],
           ui: ['lucide-react', '@radix-ui/react-dialog', '@radix-ui/react-popover', 'react-day-picker', 'sonner'],
           forms: ['formik', 'yup'],
-          dates: ['dayjs', 'moment'],
-          maps: ['@geoapify/geocoder-autocomplete', '@geoapify/react-geocoder-autocomplete']
+          dates: ['dayjs'],
         }
       }
     }

@@ -17,17 +17,10 @@ export function Search() {
   const { profiledata } = useAuth();
   const [searchtext, setSearchtext] = useState("");
   const [userdata, setUserdata] = useState({});
-  const [usercoordsset, setUsercoordsset] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const searchdone = useRef(false);
   const resultsRef = useRef(null);
-
-  useEffect(() => {
-    if (!isObjEmpty(userdata)) {
-      setUsercoordsset(userdata?.defaultcoordsset || userdata?.usercoordsset || userdata?.exactcoordsset)
-    }
-  }, [userdata]);
 
   useEffect(() => {
     if (searchdone.current && resultsRef.current) {
@@ -37,14 +30,13 @@ export function Search() {
         block: 'start' 
       });
     }
-  }, [searchdone.current, userdata]);
+  }, [userdata]);
 
     const handleSearchSubmit = async (e) => {
         e.preventDefault()
         
         var phoneregex = /^\d{10}$/;
-        var emailregex = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/;
-        var useridregex = /^\d{5,7}$/;
+        var emailregex = /^[\w.-]+@([\w-]+\.)+[\w-]{2,4}$/;
 
         //https://www.makeuseof.com/regular-expressions-validate-user-account/
         //he number of characters must be between 5 and 15

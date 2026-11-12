@@ -1,4 +1,28 @@
-# Logs
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production builds
+dist/
+dist-ssr/
+.wrangler/
+
+# Environment files (never commit local secrets)
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Playwright
+playwright-report/
+test-results/
+blob-report/
+playwright/.cache/
+
+# Coverage and logs
+coverage/
+logs/
 logs
 *.log
 npm-debug.log*
@@ -7,27 +31,17 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-scripts
-dist
-dist-ssr
-*.local
+# Local helper scripts
+scripts/
 
-# Playwright
-test-results
-playwright-report
-blob-report
-playwright/.cache
-
-# Editor directories and files
+# Editor and OS metadata
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-
-*.env
+*.local

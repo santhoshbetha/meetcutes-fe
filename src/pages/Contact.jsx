@@ -1,13 +1,9 @@
-import { useState } from "react";
-import QRPayPal from "@/assets/QRPayPal.png";
 import { Container } from "@/components/Container";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Mail, Code, Lightbulb, MessageSquare, Phone, HelpCircle } from "lucide-react";
 
 export function Contact() {
-  const [qrImg, SetQrImg] = useState(QRPayPal);
-
   const contactMethods = [
     {
       icon: <MessageSquare className="w-6 h-6" />,
