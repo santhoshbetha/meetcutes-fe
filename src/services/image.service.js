@@ -1,5 +1,6 @@
 import { api } from "@/lib/api";
 import { validateProfileImage } from "@/lib/imageValidation";
+import { createUploadSignal } from "@/lib/uploadConfig";
 import { unwrapProfile } from "@/services/profile.service";
 
 export const MAX_PROFILE_IMAGES = 10;
@@ -27,8 +28,18 @@ export async function uploadImage(file, slot, { signal } = {}) {
   form.append("slot", String(slot));
   form.append("file", file, file?.name || "profile-photo.jpg");
 
-  const payload = await api.post("/api/v1/profiles/me/images", form, { signal });
-  return imageResult(payload);
+  const { signal: timeoutSignal, cleanup } = createUploadSignal(signal);
+
+  try {
+    const payload = await api.post(
+      "/api/v1/profiles/me/images",
+      form,
+      { signal: timeoutSignal },
+    );
+    return imageResult(payload);
+  } finally {
+    cleanup();
+  }
 }
 
 /**

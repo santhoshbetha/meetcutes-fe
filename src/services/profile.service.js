@@ -1,4 +1,5 @@
 import { api } from "@/lib/api";
+import { createUploadSignal } from "@/lib/uploadConfig";
 import { mapProfileToLegacy } from "@/services/auth.service";
 
 /**
@@ -71,9 +72,34 @@ export async function fetchProfileById(userId) {
  * Accepts either a plain object (sent as JSON) or a pre-built FormData body
  * for avatar/banner uploads.
  */
+function hasMediaUpload(attrs) {
+  if (typeof FormData !== "undefined" && attrs instanceof FormData) {
+    return ["avatar", "banner"].some((key) => {
+      const value = attrs.get(key);
+      return typeof Blob !== "undefined" && value instanceof Blob;
+    });
+  }
+
+  return ["avatar", "banner"].some((key) => {
+    const value = attrs?.[key];
+    return typeof Blob !== "undefined" && value instanceof Blob;
+  });
+}
+
 export async function updateMyProfile(attrs) {
-  const payload = await api.patch("/api/v1/profiles/me", attrs);
-  return unwrapProfile(payload);
+  if (!hasMediaUpload(attrs)) {
+    const payload = await api.patch("/api/v1/profiles/me", attrs);
+    return unwrapProfile(payload);
+  }
+
+  const { signal, cleanup } = createUploadSignal();
+
+  try {
+    const payload = await api.patch("/api/v1/profiles/me", attrs, { signal });
+    return unwrapProfile(payload);
+  } finally {
+    cleanup();
+  }
 }
 
 export async function deactivateAccount() {

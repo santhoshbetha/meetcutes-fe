@@ -10,6 +10,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import { validateProfileImage } from '@/lib/imageValidation';
+import {
+  JPEG_QUALITY,
+  MAX_OUTPUT_DIMENSION,
+} from '@/lib/imageCompression';
 
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
@@ -78,43 +82,82 @@ export function ImageUploader({
     const img = new Image();
     img.src = image;
 
-    await new Promise(resolve => {
+    await new Promise((resolve, reject) => {
       img.onload = resolve;
+      img.onerror = () => reject(new Error('Could not decode this image.'));
     });
 
     const scaleX = img.naturalWidth / img.width;
     const scaleY = img.naturalHeight / img.height;
 
-    canvas.width = croppedAreaPixels.width;
-    canvas.height = croppedAreaPixels.height;
+    const sourceWidth = croppedAreaPixels.width * scaleX;
+    const sourceHeight = croppedAreaPixels.height * scaleY;
+    const outputScale = Math.min(
+      1,
+      MAX_OUTPUT_DIMENSION / Math.max(sourceWidth, sourceHeight),
+    );
+    const outputWidth = Math.max(1, Math.round(sourceWidth * outputScale));
+    const outputHeight = Math.max(1, Math.round(sourceHeight * outputScale));
+
+    canvas.width = outputWidth;
+    canvas.height = outputHeight;
 
     const ctx = canvas.getContext('2d');
 
-    if (ctx) {
-      ctx.drawImage(
-        img,
-        croppedAreaPixels.x * scaleX,
-        croppedAreaPixels.y * scaleY,
-        croppedAreaPixels.width * scaleX,
-        croppedAreaPixels.height * scaleY,
-        0,
-        0,
-        croppedAreaPixels.width,
-        croppedAreaPixels.height,
-      );
-
-      canvas.toBlob(blob => {
-        if (blob) {
-          const previewUrl = URL.createObjectURL(blob);
-          setPreviewImage(previewUrl);
-          if (onImageCropped) {
-            onImageCropped(blob);
-          }
-          setIsCropDialogOpen(false);
-        }
-      }, 'image/jpeg');
+    if (!ctx) {
+      setError('Canvas is not available in this browser.');
+      return;
     }
-  }, [image, croppedAreaPixels, onImageCropped]);
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(
+      img,
+      croppedAreaPixels.x * scaleX,
+      croppedAreaPixels.y * scaleY,
+      sourceWidth,
+      sourceHeight,
+      0,
+      0,
+      outputWidth,
+      outputHeight,
+    );
+
+    const encode = quality =>
+      new Promise((resolve, reject) => {
+        canvas.toBlob(
+          blob => {
+            if (blob) resolve(blob);
+            else reject(new Error('Could not encode this image.'));
+          },
+          'image/jpeg',
+          quality,
+        );
+      });
+
+    try {
+      let blob = await encode(JPEG_QUALITY);
+
+      for (const quality of [0.75, 0.65, 0.55]) {
+        if (blob.size <= maxSize) break;
+        blob = await encode(quality);
+      }
+
+      if (blob.size > maxSize) {
+        setError('Compressed image is still larger than 5MB.');
+        return;
+      }
+
+      const previewUrl = URL.createObjectURL(blob);
+      setPreviewImage(previewUrl);
+      if (onImageCropped) {
+        onImageCropped(blob);
+      }
+      setIsCropDialogOpen(false);
+    } catch (encodeError) {
+      setError(encodeError.message || 'Could not process this image.');
+    }
+  }, [image, croppedAreaPixels, onImageCropped, maxSize]);
 
   const clearImage = () => {
     setRemoving(true);
